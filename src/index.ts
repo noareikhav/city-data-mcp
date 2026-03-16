@@ -24,6 +24,11 @@ import { resolveFredCity, listFredCities, queryFred, formatFredResults } from ".
 import { resolveFbiCity, listFbiCities, queryFbiCrime, formatFbiResults } from "./sources/fbi.js";
 import { resolveBlsCity, listBlsCities, queryBls, formatBlsResults } from "./sources/bls.js";
 import { buildCohort, formatCohortResults, type CohortCriteria } from "./sources/cohort.js";
+import { queryWeather, formatWeatherResults } from "./sources/nws.js";
+import { queryAirQuality, formatAirQualityResults } from "./sources/airnow.js";
+import { queryHud, formatHudResults } from "./sources/hud.js";
+import { queryWater, formatWaterResults } from "./sources/usgs.js";
+import { queryCivic, formatCivicResults } from "./sources/civic.js";
 
 async function createMcpServer() {
   const server = new McpServer(
@@ -168,7 +173,7 @@ Use this to explore what's happening in a specific city.`,
         content: [
           {
             type: "text" as const,
-            text: `# Civic Data Hub — Available Data\n\n## Crime & 311 (Socrata)\n${cityList}\n\n## Demographics (US Census ACS)\n${censusList}\n\n## Economic Indicators (FRED)\n${fredCities.length} metros: ${fredList}\n\n## Employment (BLS)\n${blsCities.length} metros: ${blsCities.map((c) => c.name).join(", ")}\n\n## FBI Crime Statistics (UCR)\n${fbiCities.length} cities (state-level)\n\n## Tools\n- \`query_city_data\` — crime/311 data\n- \`query_demographics\` — Census data for ANY US city\n- \`compare_demographics\` — side-by-side Census comparison\n- \`query_economics\` — FRED economic indicators\n- \`query_employment\` — BLS employment & unemployment\n- \`query_national_crime\` — FBI UCR crime statistics\n- \`create_cohort\` — find peer cities by similarity (the magic one)`,
+            text: `# Civic Data Hub — Available Data\n\n## Crime & 311 (Socrata)\n${cityList}\n\n## Demographics (US Census ACS)\n${censusList}\n\n## Economic Indicators (FRED)\n${fredCities.length} metros: ${fredList}\n\n## Employment (BLS)\n${blsCities.length} metros: ${blsCities.map((c) => c.name).join(", ")}\n\n## FBI Crime Statistics (UCR)\n${fbiCities.length} cities (state-level)\n\n## Weather (NWS)\nAny US location — current conditions, forecast, active alerts. No API key needed.\n\n## Air Quality (EPA AirNow)\n~45 major cities + any 5-digit ZIP code. Requires AIRNOW_API_KEY.\n\n## Housing (HUD)\n~35 major cities — Fair Market Rents, Area Median Income, income limits.\n\n## Water Data (USGS)\n~30 major cities — real-time streamflow, gage height, water temperature.\n\n## Representatives (Google Civic)\nAny US address — elected officials at federal, state, and local levels. Requires GOOGLE_CIVIC_API_KEY.\n\n## Tools\n- \`query_city_data\` — crime/311 data\n- \`query_demographics\` — Census data for ANY US city\n- \`compare_demographics\` — side-by-side Census comparison\n- \`query_economics\` — FRED economic indicators\n- \`query_employment\` — BLS employment & unemployment\n- \`query_national_crime\` — FBI UCR crime statistics\n- \`create_cohort\` — find peer cities by similarity\n- \`query_weather\` — NWS weather + alerts\n- \`query_air_quality\` — EPA AQI readings + forecast\n- \`query_housing\` — HUD fair market rents + income limits\n- \`query_water\` — USGS real-time water monitoring\n- \`query_representatives\` — elected officials lookup`,
           },
         ],
       };
@@ -541,6 +546,106 @@ This is powerful for benchmarking — "how does Denver compare to its peers?"`,
             },
           ],
         };
+      }
+    }
+  );
+
+  // --- Tool 9: query_weather ---
+  server.registerTool(
+    "query_weather",
+    {
+      title: "Query City Weather",
+      description: `Get current weather conditions, 3-day forecast, and active alerts for any US city. Real-time data from the National Weather Service. No API key needed.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Boise', 'NYC')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryWeather(args.city);
+        return { content: [{ type: "text" as const, text: `# ${args.city} — Weather\n\n${formatWeatherResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool 10: query_air_quality ---
+  server.registerTool(
+    "query_air_quality",
+    {
+      title: "Query Air Quality",
+      description: `Get current Air Quality Index (AQI) and forecast for a US city. Shows readings for O3, PM2.5, PM10 with color-coded categories. Data from EPA AirNow. Requires AIRNOW_API_KEY.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name or 5-digit ZIP code"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryAirQuality(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Air Quality\n\n${formatAirQualityResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool 11: query_housing ---
+  server.registerTool(
+    "query_housing",
+    {
+      title: "Query HUD Housing Data",
+      description: `Get HUD Fair Market Rents and income limits for a US city. Shows rent by bedroom count, area median income, and income thresholds for housing programs. No API key needed.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'NYC', 'Boise')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryHud(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Housing\n\n${formatHudResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool 12: query_water ---
+  server.registerTool(
+    "query_water",
+    {
+      title: "Query Water Conditions",
+      description: `Get real-time water data from USGS monitoring sites near a US city. Shows streamflow, gage height, and water temperature from nearby rivers and streams. Data updates every 15 minutes. No API key needed.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Portland', 'Austin')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryWater(args.city);
+        return { content: [{ type: "text" as const, text: `# ${args.city} — Water Conditions\n\n${formatWaterResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool 13: query_representatives ---
+  server.registerTool(
+    "query_representatives",
+    {
+      title: "Query Elected Representatives",
+      description: `Look up elected officials at all levels (federal, state, local) for any US address or city. Shows name, party, office, and contact info. Requires GOOGLE_CIVIC_API_KEY.`,
+      inputSchema: z.object({
+        address: z.string().describe("City name or full address (e.g., 'Denver', '1600 Pennsylvania Ave, Washington DC')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryCivic(args.address);
+        return { content: [{ type: "text" as const, text: `# Representatives\n\n${formatCivicResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
       }
     }
   );

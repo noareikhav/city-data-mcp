@@ -1,0 +1,110 @@
+{
+  "nyc": {
+    "name": "New York City",
+    "state": "NY",
+    "population": 8336817,
+    "domain": "data.cityofnewyork.us",
+    "aliases": ["nyc", "new york", "new york city", "manhattan"],
+    "datasets": {
+      "crime": {
+        "id": "5uac-w243",
+        "name": "NYPD Complaints (Year to Date)",
+        "dateField": "cmplnt_fr_dt",
+        "descriptionField": "ofns_desc",
+        "locationFields": ["boro_nm", "addr_pct_cd"]
+      },
+      "311": {
+        "id": "erm2-nwe9",
+        "name": "311 Service Requests",
+        "dateField": "created_date",
+        "descriptionField": "complaint_type",
+        "locationFields": ["borough", "city"]
+      }
+    }
+  },
+  "chicago": {
+    "name": "Chicago",
+    "state": "IL",
+    "population": 2665039,
+    "domain": "data.cityofchicago.org",
+    "aliases": ["chicago", "chi"],
+    "datasets": {
+      "crime": {
+        "id": "ijzp-q8t2",
+        "name": "Crimes - 2001 to Present",
+        "dateField": "date",
+        "descriptionField": "primary_type",
+        "locationFields": ["block", "district"]
+      },
+      "311": {
+        "id": "v6vf-nfxy",
+        "name": "311 Service Requests",
+        "dateField": "created_date",
+        "descriptionField": "sr_type",
+        "locationFields": ["street_address", "city"]
+      }
+    }
+  },
+  "sf": {
+    "name": "San Francisco",
+    "state": "CA",
+    "population": 808437,
+    "domain": "data.sfgov.org",
+    "aliases": ["sf", "san francisco", "san fran"],
+    "datasets": {
+      "crime": {
+        "id": "wg3w-h783",
+        "name": "Police Department Incident Reports: 2018 to Present",
+        "dateField": "incident_date",
+        "descriptionField": "incident_category",
+        "locationFields": ["analysis_neighborhood", "police_district"]
+      },
+      "311": {
+        "id": "vw6y-z8j6",
+        "name": "311 Cases",
+        "dateField": "opened",
+        "descriptionField": "service_name",
+        "locationFields": ["neighborhood", "address"]
+      }
+    }
+  },
+  "la": {
+    "name": "Los Angeles",
+    "state": "CA",
+    "population": 3898747,
+    "domain": "data.lacity.org",
+    "aliases": ["la", "los angeles", "l.a."],
+    "datasets": {
+      "crime": {
+        "id": "2nrs-mtv8",
+        "name": "Crime Data from 2020 to Present",
+        "dateField": "date_occ",
+        "descriptionField": "crm_cd_desc",
+        "locationFields": ["area_name", "location"]
+      },
+      "311": {
+        "id": "pvft-t9nq",
+        "name": "MyLA311 Service Request Data",
+        "dateField": "createddate",
+        "descriptionField": "requesttype",
+        "locationFields": ["address", "cd"]
+      }
+    }
+  },
+  "seattle": {
+    "name": "Seattle",
+    "state": "WA",
+    "population": 749256,
+    "domain": "data.seattle.gov",
+    "aliases": ["seattle"],
+    "datasets": {
+      "crime": {
+        "id": "tazs-3rd5",
+        "name": "SPD Crime Data: 2008-Present",
+        "dateField": "offense_start_datetime",
+        "descriptionField": "offense",
+        "locationFields": ["mcpp", "precinct"]
+      }
+    }
+  }
+}

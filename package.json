@@ -1,0 +1,42 @@
+{
+  "name": "city-data-mcp",
+  "version": "0.1.0",
+  "description": "Multi-city public data MCP server - query and compare crime, 311, economic, and demographic data across US cities",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "city-data-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "claude",
+    "open-data",
+    "city-data",
+    "socrata",
+    "crime",
+    "government"
+  ],
+  "author": "Noa Reikhav",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/noareikhav/city-data-mcp"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "files": [
+    "dist",
+    "data"
+  ]
+}

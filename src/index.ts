@@ -35,6 +35,9 @@ import { queryTransit, formatTransitResults, listTransitCities } from "./sources
 import { querySchools, formatSchoolResults, listSchoolCities } from "./sources/schools.js";
 import { queryPermits, formatPermitResults, listPermitCities } from "./sources/permits.js";
 import { queryBudget, formatBudgetResults, listBudgetCities } from "./sources/budget.js";
+import { buildCityBriefing, formatBriefing } from "./sources/briefing.js";
+import { mapIssueData, formatIssueData, listIssueTopics } from "./sources/issue-mapper.js";
+import { trackCityChanges, formatChangeTracker } from "./sources/change-tracker.js";
 
 async function createMcpServer() {
   const server = new McpServer(
@@ -179,7 +182,7 @@ Use this to explore what's happening in a specific city.`,
         content: [
           {
             type: "text" as const,
-            text: `# Civic Data Hub — Available Data\n\n## Crime & 311 (Socrata)\n${cityList}\n\n## Demographics (US Census ACS)\n${censusList}\n\n## Economic Indicators (FRED)\n${fredCities.length} metros: ${fredList}\n\n## Employment (BLS)\n${blsCities.length} metros: ${blsCities.map((c) => c.name).join(", ")}\n\n## FBI Crime Statistics (UCR)\n${fbiCities.length} cities (state-level)\n\n## Weather (NWS)\nAny US location — current conditions, forecast, active alerts. No API key needed.\n\n## Air Quality (EPA AirNow)\n~45 major cities + any 5-digit ZIP code. Requires AIRNOW_API_KEY.\n\n## Housing (HUD)\n~35 major cities — Fair Market Rents, Area Median Income, income limits.\n\n## Water Data (USGS)\n~30 major cities — real-time streamflow, gage height, water temperature.\n\n## Representatives (Google Civic)\nAny US address — elected officials at federal, state, and local levels. Requires GOOGLE_CIVIC_API_KEY.\n\n## Tools\n- \`query_city_data\` — crime/311 data\n- \`query_demographics\` — Census data for ANY US city\n- \`compare_demographics\` — side-by-side Census comparison\n- \`query_economics\` — FRED economic indicators\n- \`query_employment\` — BLS employment & unemployment\n- \`query_national_crime\` — FBI UCR crime statistics\n- \`create_census_cohort\` — fast peer cities (demographics only, ~75 cities)\n- \`create_full_cohort\` — rich peer cities (Census+FRED+BLS+FBI, ~50 cities)\n- \`query_weather\` — NWS weather + alerts\n- \`query_air_quality\` — EPA AQI readings + forecast\n- \`query_housing\` — HUD fair market rents + income limits\n- \`query_water\` — USGS real-time water monitoring\n- \`query_representatives\` — elected officials lookup\n- \`query_311_trends\` — 311 complaint trends and top categories\n- \`query_transit\` — public transit ridership and performance (NTD)\n- \`query_schools\` — school district enrollment, finance, student-teacher ratios\n- \`query_permits\` — building permit trends (Census BPS, 5-year)\n- \`query_budget\` — city government budget breakdown`,
+            text: `# Civic Data Hub — Available Data\n\n## Crime & 311 (Socrata)\n${cityList}\n\n## Demographics (US Census ACS)\n${censusList}\n\n## Economic Indicators (FRED)\n${fredCities.length} metros: ${fredList}\n\n## Employment (BLS)\n${blsCities.length} metros: ${blsCities.map((c) => c.name).join(", ")}\n\n## FBI Crime Statistics (UCR)\n${fbiCities.length} cities (state-level)\n\n## Weather (NWS)\nAny US location — current conditions, forecast, active alerts. No API key needed.\n\n## Air Quality (EPA AirNow)\n~45 major cities + any 5-digit ZIP code. Requires AIRNOW_API_KEY.\n\n## Housing (HUD)\n~35 major cities — Fair Market Rents, Area Median Income, income limits.\n\n## Water Data (USGS)\n~30 major cities — real-time streamflow, gage height, water temperature.\n\n## Representatives (Google Civic)\nAny US address — elected officials at federal, state, and local levels. Requires GOOGLE_CIVIC_API_KEY.\n\n## Tools\n- \`query_city_data\` — crime/311 data\n- \`query_demographics\` — Census data for ANY US city\n- \`compare_demographics\` — side-by-side Census comparison\n- \`query_economics\` — FRED economic indicators\n- \`query_employment\` — BLS employment & unemployment\n- \`query_national_crime\` — FBI UCR crime statistics\n- \`create_census_cohort\` — fast peer cities (demographics only, ~75 cities)\n- \`create_full_cohort\` — rich peer cities (Census+FRED+BLS+FBI, ~50 cities)\n- \`query_weather\` — NWS weather + alerts\n- \`query_air_quality\` — EPA AQI readings + forecast\n- \`query_housing\` — HUD fair market rents + income limits\n- \`query_water\` — USGS real-time water monitoring\n- \`query_representatives\` — elected officials lookup\n- \`query_311_trends\` — 311 complaint trends and top categories\n- \`query_transit\` — public transit ridership and performance (NTD)\n- \`query_schools\` — school district enrollment, finance, student-teacher ratios\n- \`query_permits\` — building permit trends (Census BPS, 5-year)\n- \`query_budget\` — city government budget breakdown\n- \`create_city_briefing\` — comprehensive city profile from ALL sources\n- \`map_issue_data\` — cross-reference community issues with hard data\n- \`track_city_changes\` — directional dashboard of what's improving/declining`,
           },
         ],
       };
@@ -811,6 +814,79 @@ ${listBudgetCities().length} major cities available. Great for understanding cit
         return { content: [{ type: "text" as const, text: `# ${result.city} — City Budget\n\n${formatBudgetResults(result)}` }] };
       } catch (error) {
         return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool 19: create_city_briefing ---
+  server.registerTool(
+    "create_city_briefing",
+    {
+      title: "Create Comprehensive City Briefing",
+      description: `Pull data from ALL available sources and assemble a structured executive briefing for any US city. Covers demographics, economy, housing, safety, quality of life, government, and community voice.
+
+This is the "give me everything" tool — fetches 14 data sources in parallel. Takes 10-20 seconds but returns a complete city profile.
+
+Great for: QBR prep, council presentations, new market research, benchmarking.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Austin', 'NYC')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const briefing = await buildCityBriefing(args.city);
+        return { content: [{ type: "text" as const, text: formatBriefing(briefing) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error creating briefing for "${args.city}": ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool 20: map_issue_data ---
+  server.registerTool(
+    "map_issue_data",
+    {
+      title: "Map Community Issue to Data",
+      description: `Given a community concern or issue topic, find all relevant hard data for a city. The cross-reference engine — "residents say X, here's what the data shows."
+
+Available topics: ${listIssueTopics().join(", ")}.
+
+Also accepts free-text issues (matched to closest topic by keywords).
+
+Example: "housing affordability" in Denver → pulls home values, rent, FMR, permits, housing budget allocation.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'NYC')"),
+        issue: z.string().describe("Issue topic or free-text concern (e.g., 'housing affordability', 'public safety', 'residents complain about potholes')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await mapIssueData(args.city, args.issue);
+        return { content: [{ type: "text" as const, text: formatIssueData(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error mapping issue data: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool 21: track_city_changes ---
+  server.registerTool(
+    "track_city_changes",
+    {
+      title: "Track City Changes Over Time",
+      description: `Show how a city is changing — what's improving, declining, or holding steady. Pulls trend data from BLS (unemployment), FRED (economics), FBI (crime), building permits, and 311 complaints.
+
+Returns a directional dashboard: each metric tagged as improving, declining, or stable with supporting data. Great for spotting momentum or emerging problems.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Austin', 'NYC')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await trackCityChanges(args.city);
+        return { content: [{ type: "text" as const, text: formatChangeTracker(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error tracking changes for "${args.city}": ${error instanceof Error ? error.message : String(error)}` }] };
       }
     }
   );

@@ -11,7 +11,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "start:http": "node dist/index.js --http"
+    "start:http": "node dist/index.js --http",
+    "start:api": "node dist/api.js"
   },
   "keywords": [
     "mcp",
@@ -34,9 +35,13 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0"
   },

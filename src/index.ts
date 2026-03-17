@@ -24,6 +24,7 @@ import { resolveFredCity, listFredCities, queryFred, formatFredResults } from ".
 import { resolveFbiCity, listFbiCities, queryFbiCrime, formatFbiResults } from "./sources/fbi.js";
 import { resolveBlsCity, listBlsCities, queryBls, formatBlsResults } from "./sources/bls.js";
 import { buildCohort, formatCohortResults, type CohortCriteria } from "./sources/cohort.js";
+import { buildFullCohort, formatFullCohortResults, type FullCohortCriteria } from "./sources/full-cohort.js";
 import { queryWeather, formatWeatherResults } from "./sources/nws.js";
 import { queryAirQuality, formatAirQualityResults } from "./sources/airnow.js";
 import { queryHud, formatHudResults } from "./sources/hud.js";
@@ -173,7 +174,7 @@ Use this to explore what's happening in a specific city.`,
         content: [
           {
             type: "text" as const,
-            text: `# Civic Data Hub — Available Data\n\n## Crime & 311 (Socrata)\n${cityList}\n\n## Demographics (US Census ACS)\n${censusList}\n\n## Economic Indicators (FRED)\n${fredCities.length} metros: ${fredList}\n\n## Employment (BLS)\n${blsCities.length} metros: ${blsCities.map((c) => c.name).join(", ")}\n\n## FBI Crime Statistics (UCR)\n${fbiCities.length} cities (state-level)\n\n## Weather (NWS)\nAny US location — current conditions, forecast, active alerts. No API key needed.\n\n## Air Quality (EPA AirNow)\n~45 major cities + any 5-digit ZIP code. Requires AIRNOW_API_KEY.\n\n## Housing (HUD)\n~35 major cities — Fair Market Rents, Area Median Income, income limits.\n\n## Water Data (USGS)\n~30 major cities — real-time streamflow, gage height, water temperature.\n\n## Representatives (Google Civic)\nAny US address — elected officials at federal, state, and local levels. Requires GOOGLE_CIVIC_API_KEY.\n\n## Tools\n- \`query_city_data\` — crime/311 data\n- \`query_demographics\` — Census data for ANY US city\n- \`compare_demographics\` — side-by-side Census comparison\n- \`query_economics\` — FRED economic indicators\n- \`query_employment\` — BLS employment & unemployment\n- \`query_national_crime\` — FBI UCR crime statistics\n- \`create_cohort\` — find peer cities by similarity\n- \`query_weather\` — NWS weather + alerts\n- \`query_air_quality\` — EPA AQI readings + forecast\n- \`query_housing\` — HUD fair market rents + income limits\n- \`query_water\` — USGS real-time water monitoring\n- \`query_representatives\` — elected officials lookup`,
+            text: `# Civic Data Hub — Available Data\n\n## Crime & 311 (Socrata)\n${cityList}\n\n## Demographics (US Census ACS)\n${censusList}\n\n## Economic Indicators (FRED)\n${fredCities.length} metros: ${fredList}\n\n## Employment (BLS)\n${blsCities.length} metros: ${blsCities.map((c) => c.name).join(", ")}\n\n## FBI Crime Statistics (UCR)\n${fbiCities.length} cities (state-level)\n\n## Weather (NWS)\nAny US location — current conditions, forecast, active alerts. No API key needed.\n\n## Air Quality (EPA AirNow)\n~45 major cities + any 5-digit ZIP code. Requires AIRNOW_API_KEY.\n\n## Housing (HUD)\n~35 major cities — Fair Market Rents, Area Median Income, income limits.\n\n## Water Data (USGS)\n~30 major cities — real-time streamflow, gage height, water temperature.\n\n## Representatives (Google Civic)\nAny US address — elected officials at federal, state, and local levels. Requires GOOGLE_CIVIC_API_KEY.\n\n## Tools\n- \`query_city_data\` — crime/311 data\n- \`query_demographics\` — Census data for ANY US city\n- \`compare_demographics\` — side-by-side Census comparison\n- \`query_economics\` — FRED economic indicators\n- \`query_employment\` — BLS employment & unemployment\n- \`query_national_crime\` — FBI UCR crime statistics\n- \`create_census_cohort\` — fast peer cities (demographics only, ~75 cities)\n- \`create_full_cohort\` — rich peer cities (Census+FRED+BLS+FBI, ~50 cities)\n- \`query_weather\` — NWS weather + alerts\n- \`query_air_quality\` — EPA AQI readings + forecast\n- \`query_housing\` — HUD fair market rents + income limits\n- \`query_water\` — USGS real-time water monitoring\n- \`query_representatives\` — elected officials lookup`,
           },
         ],
       };
@@ -487,28 +488,19 @@ No additional API key needed (uses BLS public API). Rate-limited to 25 queries/d
     }
   );
 
-  // --- Tool 8: create_cohort ---
-  // The signature tool — finds peer cities based on data similarity.
+  // --- Tool 8: create_census_cohort ---
+  // Fast demographic-only cohort using Census data (~75 cities pool).
   server.registerTool(
-    "create_cohort",
+    "create_census_cohort",
     {
-      title: "Create City Peer Cohort",
-      description: `Find peer cities that are most similar to a given city based on real data.
+      title: "Create Census Peer Cohort (Fast)",
+      description: `Find peer cities based on Census demographic data. Fast — uses only Census ACS data across ~75 cities.
 
-Uses Census demographic data to compute similarity across: population, income, poverty, education, housing costs, commuting patterns, and geographic region.
+Compares: population, income, poverty, education, housing costs, commuting patterns, region.
 
-Criteria options:
-- "balanced" (default) — equal weight across all dimensions
-- "size" — prioritize similar population
-- "economics" — prioritize income and poverty levels
-- "housing" — prioritize home values and rent
-- "education" — prioritize education levels
-- "commuting" — prioritize transit and WFH patterns
-- "region" — prioritize geographic proximity
+Criteria: "balanced", "size", "economics", "housing", "education", "commuting", "region".
 
-Returns a ranked list of peer cities with similarity scores, reasons, and a comparison table.
-
-This is powerful for benchmarking — "how does Denver compare to its peers?"`,
+Use this for quick demographic peer matching. For richer multi-source comparison (economics, crime, employment), use create_full_cohort instead.`,
       inputSchema: z.object({
         city: z
           .string()
@@ -550,7 +542,62 @@ This is powerful for benchmarking — "how does Denver compare to its peers?"`,
     }
   );
 
-  // --- Tool 9: query_weather ---
+  // --- Tool 9: create_full_cohort ---
+  // Rich multi-source cohort using Census + FRED + BLS + FBI (~50 cities).
+  server.registerTool(
+    "create_full_cohort",
+    {
+      title: "Create Full Peer Cohort (Rich)",
+      description: `Find peer cities using ALL data sources: Census demographics, FRED economics, BLS employment, and FBI crime data. Richer but slower than create_census_cohort (~50 cities pool).
+
+Compares across 12 dimensions: population, income, poverty, education, home values, rent, housing price trend, unemployment, job growth, per-capita income, violent crime rate, and geographic region.
+
+Criteria options:
+- "balanced" (default) — even weight across all dimensions
+- "economics" — prioritize unemployment, job growth, income
+- "livability" — prioritize crime, education, poverty
+- "safety" — heavily weight crime rates
+- "growth" — prioritize job growth, housing trends, employment
+- "affordability" — prioritize home values, rent, housing costs
+
+Use this for comprehensive benchmarking. Takes longer due to multi-source API calls.`,
+      inputSchema: z.object({
+        city: z
+          .string()
+          .describe("Target city to find peers for (e.g., 'Denver', 'Austin')"),
+        criteria: z
+          .enum(["balanced", "economics", "livability", "safety", "growth", "affordability"])
+          .default("balanced")
+          .describe("What dimensions to weight most"),
+        cohortSize: z
+          .number()
+          .min(3)
+          .max(10)
+          .default(5)
+          .describe("How many peer cities to return (default 5)"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await buildFullCohort(args.city, args.criteria as FullCohortCriteria, args.cohortSize as number);
+        const formatted = formatFullCohortResults(result);
+        return {
+          content: [{ type: "text" as const, text: formatted }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error building full cohort for "${args.city}": ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  // --- Tool 10: query_weather ---
   server.registerTool(
     "query_weather",
     {

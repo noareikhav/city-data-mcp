@@ -951,16 +951,20 @@ async function main() {
             };
 
             await sessionServer.connect(transport);
+            session = { transport, server: sessionServer };
 
-            // Store by session ID after connection
-            const newSessionId = (transport as any).sessionId;
-            if (newSessionId) {
-              session = { transport, server: sessionServer };
-              sessions.set(newSessionId, session);
+            // Handle the request first — this is what assigns the session ID
+            await transport.handleRequest(req, res);
+
+            // Now store by the assigned session ID
+            const assignedId = (transport as any).sessionId;
+            if (assignedId) {
+              sessions.set(assignedId, session);
             }
+            return;
           }
 
-          await session!.transport.handleRequest(req, res);
+          await session.transport.handleRequest(req, res);
           return;
         }
 

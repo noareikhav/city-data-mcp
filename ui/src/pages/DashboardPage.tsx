@@ -44,10 +44,10 @@ function ApiKeyBanner() {
         <div className="mt-3 text-xs leading-relaxed space-y-1" style={{ color: 'var(--text-secondary)' }}>
           <p>Set environment variables before starting the API server:</p>
           <div className="rounded-lg p-3 mt-2 font-mono text-xs" style={{ background: 'var(--bg-input)' }}>
-            <div><span style={{color:'#818cf8'}}>CENSUS_API_KEY</span>=… <span style={{color:'var(--text-muted)'}}>← api.data.gov/signup</span></div>
-            <div><span style={{color:'#818cf8'}}>FRED_API_KEY</span>=… <span style={{color:'var(--text-muted)'}}>← fred.stlouisfed.org</span></div>
-            <div><span style={{color:'#818cf8'}}>BLS_API_KEY</span>=… <span style={{color:'var(--text-muted)'}}>← bls.gov/developers</span></div>
-            <div><span style={{color:'#818cf8'}}>AIRNOW_API_KEY</span>=… <span style={{color:'var(--text-muted)'}}>← airnowapi.org</span></div>
+            <div><span style={{color:'#818cf8'}}>CENSUS_API_KEY</span>=… <span style={{color:'var(--text-muted)'}}>← api.census.gov/data/key_signup.html</span></div>
+            <div><span style={{color:'#818cf8'}}>FRED_API_KEY</span>=… <span style={{color:'var(--text-muted)'}}>← fred.stlouisfed.org/docs/api/api_key.html</span></div>
+            <div><span style={{color:'#818cf8'}}>AIRNOW_API_KEY</span>=… <span style={{color:'var(--text-muted)'}}>← docs.airnowapi.org/account/request</span></div>
+            <div><span style={{color:'#818cf8'}}>GOOGLE_CIVIC_API_KEY</span>=… <span style={{color:'var(--text-muted)'}}>← console.cloud.google.com/apis</span></div>
           </div>
           <p className="mt-2">Data sources without keys (Budget, 311, Transit, Schools) will load automatically.</p>
         </div>

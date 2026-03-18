@@ -99,6 +99,10 @@ export function OverviewSection({ city }: SectionProps) {
   );
   const latestViolentYear = violentOffense?.years?.[violentOffense.years.length - 1];
 
+  // Extract traffic fatality rate (latest year)
+  const trafficYears = traffic.data?.county?.years ?? traffic.data?.state?.years;
+  const latestTrafficYear = trafficYears?.[trafficYears.length - 1];
+
   return (
     <SectionWrapper title="Overview">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

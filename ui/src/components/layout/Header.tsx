@@ -13,6 +13,7 @@ export function Header({ city, onCityChange }: HeaderProps) {
 
   const tabs = [
     { label: 'Dashboard', path: '/' },
+    { label: 'Brief', path: '/brief' },
     { label: 'Changes', path: '/changes' },
     { label: 'Compare', path: '/compare' },
   ];

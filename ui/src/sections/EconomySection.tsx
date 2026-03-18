@@ -62,11 +62,11 @@ export function EconomySection({ city }: SectionProps) {
   if (anyLoading) return <LoadingSpinner text="Loading economy data..." />;
   if (noData) return null;
 
-  // Map monthly unemployment data for trend chart
-  const unemploymentTrend = bls.data?.unemployment?.monthly?.map((m) => ({
+  // Map monthly unemployment data for trend chart (API returns 'rate' not 'value')
+  const unemploymentTrend = (bls.data?.unemployment?.monthly?.map((m: any) => ({
     label: m.date,
-    value: m.value,
-  })) ?? [];
+    value: m.rate ?? m.value,
+  })) ?? []).reverse(); // Reverse so oldest is first (left-to-right)
 
   // Find specific FRED series
   const housingIndex = fred.data?.series?.find(

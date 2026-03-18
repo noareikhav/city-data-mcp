@@ -18,72 +18,73 @@ const BASE_URL = "https://educationdata.urban.org/api/v1";
 const DATA_YEAR = 2022; // Most recent complete year (education data lags)
 
 // City → county mapping for district lookups
-const CITY_COUNTIES: Record<string, { name: string; stateFips: string; countyName: string }> = {
-  "new york": { name: "New York City", stateFips: "36", countyName: "New York" },
-  "nyc": { name: "New York City", stateFips: "36", countyName: "New York" },
-  "los angeles": { name: "Los Angeles", stateFips: "06", countyName: "Los Angeles" },
-  "la": { name: "Los Angeles", stateFips: "06", countyName: "Los Angeles" },
-  "chicago": { name: "Chicago", stateFips: "17", countyName: "Cook" },
-  "houston": { name: "Houston", stateFips: "48", countyName: "Harris" },
-  "phoenix": { name: "Phoenix", stateFips: "04", countyName: "Maricopa" },
-  "philadelphia": { name: "Philadelphia", stateFips: "42", countyName: "Philadelphia" },
-  "philly": { name: "Philadelphia", stateFips: "42", countyName: "Philadelphia" },
-  "san antonio": { name: "San Antonio", stateFips: "48", countyName: "Bexar" },
-  "san diego": { name: "San Diego", stateFips: "06", countyName: "San Diego" },
-  "dallas": { name: "Dallas", stateFips: "48", countyName: "Dallas" },
-  "austin": { name: "Austin", stateFips: "48", countyName: "Travis" },
-  "san jose": { name: "San Jose", stateFips: "06", countyName: "Santa Clara" },
-  "jacksonville": { name: "Jacksonville", stateFips: "12", countyName: "Duval" },
-  "columbus": { name: "Columbus", stateFips: "39", countyName: "Franklin" },
-  "indianapolis": { name: "Indianapolis", stateFips: "18", countyName: "Marion" },
-  "indy": { name: "Indianapolis", stateFips: "18", countyName: "Marion" },
-  "san francisco": { name: "San Francisco", stateFips: "06", countyName: "San Francisco" },
-  "sf": { name: "San Francisco", stateFips: "06", countyName: "San Francisco" },
-  "seattle": { name: "Seattle", stateFips: "53", countyName: "King" },
-  "denver": { name: "Denver", stateFips: "08", countyName: "Denver" },
-  "nashville": { name: "Nashville", stateFips: "47", countyName: "Davidson" },
-  "portland": { name: "Portland", stateFips: "41", countyName: "Multnomah" },
-  "las vegas": { name: "Las Vegas", stateFips: "32", countyName: "Clark" },
-  "vegas": { name: "Las Vegas", stateFips: "32", countyName: "Clark" },
-  "memphis": { name: "Memphis", stateFips: "47", countyName: "Shelby" },
-  "louisville": { name: "Louisville", stateFips: "21", countyName: "Jefferson" },
-  "baltimore": { name: "Baltimore", stateFips: "24", countyName: "Baltimore" },
-  "milwaukee": { name: "Milwaukee", stateFips: "55", countyName: "Milwaukee" },
-  "albuquerque": { name: "Albuquerque", stateFips: "35", countyName: "Bernalillo" },
-  "tucson": { name: "Tucson", stateFips: "04", countyName: "Pima" },
-  "fresno": { name: "Fresno", stateFips: "06", countyName: "Fresno" },
-  "sacramento": { name: "Sacramento", stateFips: "06", countyName: "Sacramento" },
-  "kansas city": { name: "Kansas City", stateFips: "29", countyName: "Jackson" },
-  "kc": { name: "Kansas City", stateFips: "29", countyName: "Jackson" },
-  "atlanta": { name: "Atlanta", stateFips: "13", countyName: "Fulton" },
-  "omaha": { name: "Omaha", stateFips: "31", countyName: "Douglas" },
-  "raleigh": { name: "Raleigh", stateFips: "37", countyName: "Wake" },
-  "miami": { name: "Miami", stateFips: "12", countyName: "Miami-Dade" },
-  "minneapolis": { name: "Minneapolis", stateFips: "27", countyName: "Hennepin" },
-  "tampa": { name: "Tampa", stateFips: "12", countyName: "Hillsborough" },
-  "new orleans": { name: "New Orleans", stateFips: "22", countyName: "Orleans" },
-  "nola": { name: "New Orleans", stateFips: "22", countyName: "Orleans" },
-  "cleveland": { name: "Cleveland", stateFips: "39", countyName: "Cuyahoga" },
-  "pittsburgh": { name: "Pittsburgh", stateFips: "42", countyName: "Allegheny" },
-  "st. louis": { name: "St. Louis", stateFips: "29", countyName: "St. Louis" },
-  "st louis": { name: "St. Louis", stateFips: "29", countyName: "St. Louis" },
-  "cincinnati": { name: "Cincinnati", stateFips: "39", countyName: "Hamilton" },
-  "orlando": { name: "Orlando", stateFips: "12", countyName: "Orange" },
-  "salt lake city": { name: "Salt Lake City", stateFips: "49", countyName: "Salt Lake" },
-  "slc": { name: "Salt Lake City", stateFips: "49", countyName: "Salt Lake" },
-  "richmond": { name: "Richmond", stateFips: "51", countyName: "Richmond" },
-  "birmingham": { name: "Birmingham", stateFips: "01", countyName: "Jefferson" },
-  "buffalo": { name: "Buffalo", stateFips: "36", countyName: "Erie" },
-  "charlotte": { name: "Charlotte", stateFips: "37", countyName: "Mecklenburg" },
-  "boise": { name: "Boise", stateFips: "16", countyName: "Ada" },
-  "oklahoma city": { name: "Oklahoma City", stateFips: "40", countyName: "Oklahoma" },
-  "okc": { name: "Oklahoma City", stateFips: "40", countyName: "Oklahoma" },
-  "boston": { name: "Boston", stateFips: "25", countyName: "Suffolk" },
-  "washington": { name: "Washington, D.C.", stateFips: "11", countyName: "District of Columbia" },
-  "washington dc": { name: "Washington, D.C.", stateFips: "11", countyName: "District of Columbia" },
-  "dc": { name: "Washington, D.C.", stateFips: "11", countyName: "District of Columbia" },
-  "detroit": { name: "Detroit", stateFips: "26", countyName: "Wayne" },
-  "virginia beach": { name: "Virginia Beach", stateFips: "51", countyName: "Virginia Beach" },
+// countyFips is the full county FIPS code (state + county) used by the Education Data API
+const CITY_COUNTIES: Record<string, { name: string; stateFips: string; countyName: string; countyFips: string }> = {
+  "new york": { name: "New York City", stateFips: "36", countyName: "New York", countyFips: "36061" },
+  "nyc": { name: "New York City", stateFips: "36", countyName: "New York", countyFips: "36061" },
+  "los angeles": { name: "Los Angeles", stateFips: "06", countyName: "Los Angeles", countyFips: "6037" },
+  "la": { name: "Los Angeles", stateFips: "06", countyName: "Los Angeles", countyFips: "6037" },
+  "chicago": { name: "Chicago", stateFips: "17", countyName: "Cook", countyFips: "17031" },
+  "houston": { name: "Houston", stateFips: "48", countyName: "Harris", countyFips: "48201" },
+  "phoenix": { name: "Phoenix", stateFips: "04", countyName: "Maricopa", countyFips: "4013" },
+  "philadelphia": { name: "Philadelphia", stateFips: "42", countyName: "Philadelphia", countyFips: "42101" },
+  "philly": { name: "Philadelphia", stateFips: "42", countyName: "Philadelphia", countyFips: "42101" },
+  "san antonio": { name: "San Antonio", stateFips: "48", countyName: "Bexar", countyFips: "48029" },
+  "san diego": { name: "San Diego", stateFips: "06", countyName: "San Diego", countyFips: "6073" },
+  "dallas": { name: "Dallas", stateFips: "48", countyName: "Dallas", countyFips: "48113" },
+  "austin": { name: "Austin", stateFips: "48", countyName: "Travis", countyFips: "48453" },
+  "san jose": { name: "San Jose", stateFips: "06", countyName: "Santa Clara", countyFips: "6085" },
+  "jacksonville": { name: "Jacksonville", stateFips: "12", countyName: "Duval", countyFips: "12031" },
+  "columbus": { name: "Columbus", stateFips: "39", countyName: "Franklin", countyFips: "39049" },
+  "indianapolis": { name: "Indianapolis", stateFips: "18", countyName: "Marion", countyFips: "18097" },
+  "indy": { name: "Indianapolis", stateFips: "18", countyName: "Marion", countyFips: "18097" },
+  "san francisco": { name: "San Francisco", stateFips: "06", countyName: "San Francisco", countyFips: "6075" },
+  "sf": { name: "San Francisco", stateFips: "06", countyName: "San Francisco", countyFips: "6075" },
+  "seattle": { name: "Seattle", stateFips: "53", countyName: "King", countyFips: "53033" },
+  "denver": { name: "Denver", stateFips: "08", countyName: "Denver", countyFips: "8031" },
+  "nashville": { name: "Nashville", stateFips: "47", countyName: "Davidson", countyFips: "47037" },
+  "portland": { name: "Portland", stateFips: "41", countyName: "Multnomah", countyFips: "41051" },
+  "las vegas": { name: "Las Vegas", stateFips: "32", countyName: "Clark", countyFips: "32003" },
+  "vegas": { name: "Las Vegas", stateFips: "32", countyName: "Clark", countyFips: "32003" },
+  "memphis": { name: "Memphis", stateFips: "47", countyName: "Shelby", countyFips: "47157" },
+  "louisville": { name: "Louisville", stateFips: "21", countyName: "Jefferson", countyFips: "21111" },
+  "baltimore": { name: "Baltimore", stateFips: "24", countyName: "Baltimore", countyFips: "24510" },
+  "milwaukee": { name: "Milwaukee", stateFips: "55", countyName: "Milwaukee", countyFips: "55079" },
+  "albuquerque": { name: "Albuquerque", stateFips: "35", countyName: "Bernalillo", countyFips: "35001" },
+  "tucson": { name: "Tucson", stateFips: "04", countyName: "Pima", countyFips: "4019" },
+  "fresno": { name: "Fresno", stateFips: "06", countyName: "Fresno", countyFips: "6019" },
+  "sacramento": { name: "Sacramento", stateFips: "06", countyName: "Sacramento", countyFips: "6067" },
+  "kansas city": { name: "Kansas City", stateFips: "29", countyName: "Jackson", countyFips: "29095" },
+  "kc": { name: "Kansas City", stateFips: "29", countyName: "Jackson", countyFips: "29095" },
+  "atlanta": { name: "Atlanta", stateFips: "13", countyName: "Fulton", countyFips: "13121" },
+  "omaha": { name: "Omaha", stateFips: "31", countyName: "Douglas", countyFips: "31055" },
+  "raleigh": { name: "Raleigh", stateFips: "37", countyName: "Wake", countyFips: "37183" },
+  "miami": { name: "Miami", stateFips: "12", countyName: "Miami-Dade", countyFips: "12086" },
+  "minneapolis": { name: "Minneapolis", stateFips: "27", countyName: "Hennepin", countyFips: "27053" },
+  "tampa": { name: "Tampa", stateFips: "12", countyName: "Hillsborough", countyFips: "12057" },
+  "new orleans": { name: "New Orleans", stateFips: "22", countyName: "Orleans", countyFips: "22071" },
+  "nola": { name: "New Orleans", stateFips: "22", countyName: "Orleans", countyFips: "22071" },
+  "cleveland": { name: "Cleveland", stateFips: "39", countyName: "Cuyahoga", countyFips: "39035" },
+  "pittsburgh": { name: "Pittsburgh", stateFips: "42", countyName: "Allegheny", countyFips: "42003" },
+  "st. louis": { name: "St. Louis", stateFips: "29", countyName: "St. Louis", countyFips: "29510" },
+  "st louis": { name: "St. Louis", stateFips: "29", countyName: "St. Louis", countyFips: "29510" },
+  "cincinnati": { name: "Cincinnati", stateFips: "39", countyName: "Hamilton", countyFips: "39061" },
+  "orlando": { name: "Orlando", stateFips: "12", countyName: "Orange", countyFips: "12095" },
+  "salt lake city": { name: "Salt Lake City", stateFips: "49", countyName: "Salt Lake", countyFips: "49035" },
+  "slc": { name: "Salt Lake City", stateFips: "49", countyName: "Salt Lake", countyFips: "49035" },
+  "richmond": { name: "Richmond", stateFips: "51", countyName: "Richmond", countyFips: "51760" },
+  "birmingham": { name: "Birmingham", stateFips: "01", countyName: "Jefferson", countyFips: "1073" },
+  "buffalo": { name: "Buffalo", stateFips: "36", countyName: "Erie", countyFips: "36029" },
+  "charlotte": { name: "Charlotte", stateFips: "37", countyName: "Mecklenburg", countyFips: "37119" },
+  "boise": { name: "Boise", stateFips: "16", countyName: "Ada", countyFips: "16001" },
+  "oklahoma city": { name: "Oklahoma City", stateFips: "40", countyName: "Oklahoma", countyFips: "40109" },
+  "okc": { name: "Oklahoma City", stateFips: "40", countyName: "Oklahoma", countyFips: "40109" },
+  "boston": { name: "Boston", stateFips: "25", countyName: "Suffolk", countyFips: "25025" },
+  "washington": { name: "Washington, D.C.", stateFips: "11", countyName: "District of Columbia", countyFips: "11001" },
+  "washington dc": { name: "Washington, D.C.", stateFips: "11", countyName: "District of Columbia", countyFips: "11001" },
+  "dc": { name: "Washington, D.C.", stateFips: "11", countyName: "District of Columbia", countyFips: "11001" },
+  "detroit": { name: "Detroit", stateFips: "26", countyName: "Wayne", countyFips: "26163" },
+  "virginia beach": { name: "Virginia Beach", stateFips: "51", countyName: "Virginia Beach", countyFips: "51810" },
 };
 
 export interface SchoolResult {
@@ -133,17 +134,20 @@ interface FinanceRecord {
  * Resolve a city name to its county mapping.
  * Falls back to the shared geo-resolver for cities not in the hardcoded map.
  */
-async function resolveCity(input: string): Promise<{ name: string; stateFips: string; countyName: string } | null> {
+async function resolveCity(input: string): Promise<{ name: string; stateFips: string; countyName: string; countyFips: string } | null> {
   const normalized = input.toLowerCase().trim();
   let match = CITY_COUNTIES[normalized] || null;
 
   if (!match) {
     try {
       const geo = await geoResolve(input);
+      // Build county FIPS from state + county codes
+      const cFips = `${parseInt(geo.stateFips, 10)}${geo.countyFips || "000"}`;
       match = {
         name: geo.city,
         stateFips: geo.stateFips,
         countyName: geo.countyName,
+        countyFips: cFips,
       };
     } catch {
       // geo-resolver failed
@@ -196,10 +200,14 @@ async function fetchEdData<T>(endpoint: string): Promise<T[]> {
  */
 async function fetchDirectoryData(
   stateFips: string,
-  countyName: string,
+  countyFips: string,
 ): Promise<DirectoryRecord[]> {
-  const endpoint = `/school-districts/ccd/directory/${DATA_YEAR}/?state_fips=${stateFips}&county_name=${encodeURIComponent(countyName)}`;
-  return fetchEdData<DirectoryRecord>(endpoint);
+  // The Education Data API uses 'fips' for state filter (no leading zeros)
+  // Then we filter client-side by county_code
+  const endpoint = `/school-districts/ccd/directory/${DATA_YEAR}/?fips=${parseInt(stateFips, 10)}`;
+  const allDistricts = await fetchEdData<DirectoryRecord>(endpoint);
+  // Filter to matching county — county_code is full FIPS (state + county, e.g. 8031 for Denver)
+  return allDistricts.filter((d) => String(d.county_code) === countyFips);
 }
 
 /**
@@ -207,10 +215,11 @@ async function fetchDirectoryData(
  */
 async function fetchFinanceData(
   stateFips: string,
-  countyName: string,
+  countyFips: string,
 ): Promise<FinanceRecord[]> {
-  const endpoint = `/school-districts/ccd/finance/${DATA_YEAR}/?state_fips=${stateFips}&county_name=${encodeURIComponent(countyName)}`;
-  return fetchEdData<FinanceRecord>(endpoint);
+  const endpoint = `/school-districts/ccd/finance/${DATA_YEAR}/?fips=${parseInt(stateFips, 10)}`;
+  const allFinance = await fetchEdData<FinanceRecord>(endpoint);
+  return allFinance.filter((f) => String(f.county_code) === countyFips);
 }
 
 /**
@@ -244,8 +253,8 @@ export async function querySchools(city: string): Promise<SchoolResult> {
 
   // Fetch directory and finance data in parallel
   const [directoryData, financeData] = await Promise.all([
-    fetchDirectoryData(cityInfo.stateFips, cityInfo.countyName),
-    fetchFinanceData(cityInfo.stateFips, cityInfo.countyName),
+    fetchDirectoryData(cityInfo.stateFips, cityInfo.countyFips),
+    fetchFinanceData(cityInfo.stateFips, cityInfo.countyFips),
   ]);
 
   // Process directory data into districts

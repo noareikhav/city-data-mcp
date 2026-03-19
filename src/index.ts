@@ -40,6 +40,10 @@ import { buildCityBriefing, formatBriefing } from "./sources/briefing.js";
 import { queryTraffic, formatTrafficResults, listTrafficCities } from "./sources/traffic.js";
 import { mapIssueData, formatIssueData, listIssueTopics } from "./sources/issue-mapper.js";
 import { trackCityChanges, formatChangeTracker } from "./sources/change-tracker.js";
+import { queryPublicHealth, formatPublicHealthResults } from "./sources/cdc-places.js";
+import { queryHomelessness, formatHomelessnessResults, listHomelessCities } from "./sources/homelessness.js";
+import { queryCpi, formatCpiResults, listCpiCities } from "./sources/cpi.js";
+import { queryMigration, formatMigrationResults } from "./sources/migration.js";
 
 async function createMcpServer() {
   const server = new McpServer(
@@ -919,6 +923,96 @@ Returns a directional dashboard: each metric tagged as improving, declining, or 
     }
   );
 
+  // --- Tool: query_public_health ---
+  server.registerTool(
+    "query_public_health",
+    {
+      title: "Query Public Health Data",
+      description: `Get public health indicators from CDC PLACES for a US city. Returns 30+ measures including obesity, diabetes, depression, mental health, smoking, binge drinking, insurance coverage, food insecurity, housing insecurity, loneliness, and disability rates.
+
+Data from BRFSS (Behavioral Risk Factor Surveillance System). Covers 500+ US cities. No API key needed.
+
+Great for: understanding community health challenges, anchoring social media health discussions with data.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Austin', 'NYC')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryPublicHealth(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Public Health\n\n${formatPublicHealthResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool: query_homelessness ---
+  server.registerTool(
+    "query_homelessness",
+    {
+      title: "Query Homelessness Data",
+      description: `HUD Point-in-Time (PIT) homelessness counts for US cities. Returns total homeless, sheltered vs unsheltered, chronic homelessness, veterans, families, unaccompanied youth, per-capita rates, and year-over-year trends.
+
+${listHomelessCities().length} cities available. Data from January 2024 PIT count (AHAR Part 1).`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Los Angeles', 'Seattle')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryHomelessness(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Homelessness\n\n${formatHomelessnessResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool: query_cost_of_living ---
+  server.registerTool(
+    "query_cost_of_living",
+    {
+      title: "Query Cost of Living (CPI)",
+      description: `Consumer Price Index data by metro area from the Bureau of Labor Statistics. Shows overall inflation rate and breakdown by category: food, housing, transportation, medical care, and energy.
+
+${listCpiCities().length} metros available. Includes year-over-year inflation rates and monthly trend data.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'NYC', 'Chicago')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryCpi(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Cost of Living (CPI)\n\n${formatCpiResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool: query_migration ---
+  server.registerTool(
+    "query_migration",
+    {
+      title: "Query Population Migration & Mobility",
+      description: `Census geographic mobility data showing population movement patterns. Returns what percentage of a city's population moved in from a different state or abroad in the past year, vs stayed in the same house.
+
+Works for any US city (~30,000 places). Uses ACS 5-Year estimates, Table B07003.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Austin', 'Boise')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryMigration(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Migration & Mobility\n\n${formatMigrationResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
   return server;
 }
 
@@ -1011,6 +1105,12 @@ function createApiRouter(): express.Router {
   router.get("/budget/:city", safeHandler(async (city) => queryBudget(city)));
   router.get("/briefing/:city", safeHandler(async (city) => buildCityBriefing(city)));
   router.get("/changes/:city", safeHandler(async (city) => trackCityChanges(city)));
+
+  // New data sources
+  router.get("/public-health/:city", safeHandler(async (city) => queryPublicHealth(city)));
+  router.get("/homelessness/:city", safeHandler(async (city) => queryHomelessness(city)));
+  router.get("/cost-of-living/:city", safeHandler(async (city) => queryCpi(city)));
+  router.get("/migration/:city", safeHandler(async (city) => queryMigration(city)));
 
   return router;
 }

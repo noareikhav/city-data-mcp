@@ -15,7 +15,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createServer } from "node:http";
+import express from "express";
+import cors from "cors";
 import { z } from "zod";
 import { resolveCity, listCities } from "./cities.js";
 import { querySocrata, formatSocrataResults } from "./sources/socrata.js";
@@ -36,8 +37,13 @@ import { querySchools, formatSchoolResults, listSchoolCities } from "./sources/s
 import { queryPermits, formatPermitResults, listPermitCities } from "./sources/permits.js";
 import { queryBudget, formatBudgetResults, listBudgetCities } from "./sources/budget.js";
 import { buildCityBriefing, formatBriefing } from "./sources/briefing.js";
+import { queryTraffic, formatTrafficResults, listTrafficCities } from "./sources/traffic.js";
 import { mapIssueData, formatIssueData, listIssueTopics } from "./sources/issue-mapper.js";
 import { trackCityChanges, formatChangeTracker } from "./sources/change-tracker.js";
+import { queryPublicHealth, formatPublicHealthResults } from "./sources/cdc-places.js";
+import { queryHomelessness, formatHomelessnessResults, listHomelessCities } from "./sources/homelessness.js";
+import { queryCpi, formatCpiResults, listCpiCities } from "./sources/cpi.js";
+import { queryMigration, formatMigrationResults } from "./sources/migration.js";
 
 async function createMcpServer() {
   const server = new McpServer(
@@ -182,7 +188,7 @@ Use this to explore what's happening in a specific city.`,
         content: [
           {
             type: "text" as const,
-            text: `# Civic Data Hub — Available Data\n\n## Crime & 311 (Socrata)\n${cityList}\n\n## Demographics (US Census ACS)\n${censusList}\n\n## Economic Indicators (FRED)\n${fredCities.length} metros: ${fredList}\n\n## Employment (BLS)\n${blsCities.length} metros: ${blsCities.map((c) => c.name).join(", ")}\n\n## FBI Crime Statistics (UCR)\n${fbiCities.length} cities (state-level)\n\n## Weather (NWS)\nAny US location — current conditions, forecast, active alerts. No API key needed.\n\n## Air Quality (EPA AirNow)\n~45 major cities + any 5-digit ZIP code. Requires AIRNOW_API_KEY.\n\n## Housing (HUD)\n~35 major cities — Fair Market Rents, Area Median Income, income limits.\n\n## Water Data (USGS)\n~30 major cities — real-time streamflow, gage height, water temperature.\n\n## Representatives (Google Civic)\nAny US address — elected officials at federal, state, and local levels. Requires GOOGLE_CIVIC_API_KEY.\n\n## Tools\n- \`query_city_data\` — crime/311 data\n- \`query_demographics\` — Census data for ANY US city\n- \`compare_demographics\` — side-by-side Census comparison\n- \`query_economics\` — FRED economic indicators\n- \`query_employment\` — BLS employment & unemployment\n- \`query_national_crime\` — FBI UCR crime statistics\n- \`create_census_cohort\` — fast peer cities (demographics only, ~75 cities)\n- \`create_full_cohort\` — rich peer cities (Census+FRED+BLS+FBI, ~50 cities)\n- \`query_weather\` — NWS weather + alerts\n- \`query_air_quality\` — EPA AQI readings + forecast\n- \`query_housing\` — HUD fair market rents + income limits\n- \`query_water\` — USGS real-time water monitoring\n- \`query_representatives\` — elected officials lookup\n- \`query_311_trends\` — 311 complaint trends and top categories\n- \`query_transit\` — public transit ridership and performance (NTD)\n- \`query_schools\` — school district enrollment, finance, student-teacher ratios\n- \`query_permits\` — building permit trends (Census BPS, 5-year)\n- \`query_budget\` — city government budget breakdown\n- \`create_city_briefing\` — comprehensive city profile from ALL sources\n- \`map_issue_data\` — cross-reference community issues with hard data\n- \`track_city_changes\` — directional dashboard of what's improving/declining`,
+            text: `# Civic Data Hub — Available Data\n\n## Crime & 311 (Socrata)\n${cityList}\n\n## Demographics (US Census ACS)\n${censusList}\n\n## Economic Indicators (FRED)\n${fredCities.length} metros: ${fredList}\n\n## Employment (BLS)\n${blsCities.length} metros: ${blsCities.map((c) => c.name).join(", ")}\n\n## FBI Crime Statistics (UCR)\n${fbiCities.length} cities (state-level)\n\n## Weather (NWS)\nAny US location — current conditions, forecast, active alerts. No API key needed.\n\n## Air Quality (EPA AirNow)\n~45 major cities + any 5-digit ZIP code. Requires AIRNOW_API_KEY.\n\n## Housing (HUD)\n~35 major cities — Fair Market Rents, Area Median Income, income limits.\n\n## Water Data (USGS)\n~30 major cities — real-time streamflow, gage height, water temperature.\n\n## Representatives (Google Civic)\nAny US address — elected officials at federal, state, and local levels. Requires GOOGLE_CIVIC_API_KEY.\n\n## Traffic Safety (NHTSA FARS)\nAny US city — fatal crash data, pedestrian/cyclist breakdowns, alcohol-related stats. County-level primary with state context. TTI congestion data for ${listTrafficCities().length} metros. No API key needed.\n\n## Tools\n- \`query_city_data\` — crime/311 data\n- \`query_demographics\` — Census data for ANY US city\n- \`compare_demographics\` — side-by-side Census comparison\n- \`query_economics\` — FRED economic indicators\n- \`query_employment\` — BLS employment & unemployment\n- \`query_national_crime\` — FBI UCR crime statistics\n- \`create_census_cohort\` — fast peer cities (demographics only, ~75 cities)\n- \`create_full_cohort\` — rich peer cities (Census+FRED+BLS+FBI, ~50 cities)\n- \`query_weather\` — NWS weather + alerts\n- \`query_air_quality\` — EPA AQI readings + forecast\n- \`query_housing\` — HUD fair market rents + income limits\n- \`query_water\` — USGS real-time water monitoring\n- \`query_representatives\` — elected officials lookup\n- \`query_311_trends\` — 311 complaint trends and top categories\n- \`query_transit\` — public transit ridership and performance (NTD)\n- \`query_schools\` — school district enrollment, finance, student-teacher ratios\n- \`query_permits\` — building permit trends (Census BPS, 5-year)\n- \`query_budget\` — city government budget breakdown\n- \`query_traffic\` — traffic safety (NHTSA FARS) + congestion (TTI)\n- \`create_city_briefing\` — comprehensive city profile from ALL sources\n- \`map_issue_data\` — cross-reference community issues with hard data\n- \`track_city_changes\` — directional dashboard of what's improving/declining`,
           },
         ],
       };
@@ -818,6 +824,32 @@ ${listBudgetCities().length} major cities available. Great for understanding cit
     }
   );
 
+  // --- Tool: query_traffic ---
+  server.registerTool(
+    "query_traffic",
+    {
+      title: "Query Traffic Safety & Congestion",
+      description: `Traffic safety data from NHTSA FARS (Fatality Analysis Reporting System) and TTI congestion metrics. Returns fatal crash statistics (2019-2022) including pedestrian, cyclist, and alcohol-related breakdowns.
+
+County-level data as primary view with state-level context. Falls back to state-only if county data is unavailable.
+
+Congestion data (TTI Urban Mobility Report) available for ${listTrafficCities().length} metros — annual delay hours and cost per commuter.
+
+No API key needed. Works for any US city via geo-resolver.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Austin', 'NYC')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryTraffic(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Traffic Safety\n\n${formatTrafficResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
   // --- Tool 19: create_city_briefing ---
   server.registerTool(
     "create_city_briefing",
@@ -891,7 +923,196 @@ Returns a directional dashboard: each metric tagged as improving, declining, or 
     }
   );
 
+  // --- Tool: query_public_health ---
+  server.registerTool(
+    "query_public_health",
+    {
+      title: "Query Public Health Data",
+      description: `Get public health indicators from CDC PLACES for a US city. Returns 30+ measures including obesity, diabetes, depression, mental health, smoking, binge drinking, insurance coverage, food insecurity, housing insecurity, loneliness, and disability rates.
+
+Data from BRFSS (Behavioral Risk Factor Surveillance System). Covers 500+ US cities. No API key needed.
+
+Great for: understanding community health challenges, anchoring social media health discussions with data.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Austin', 'NYC')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryPublicHealth(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Public Health\n\n${formatPublicHealthResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool: query_homelessness ---
+  server.registerTool(
+    "query_homelessness",
+    {
+      title: "Query Homelessness Data",
+      description: `HUD Point-in-Time (PIT) homelessness counts for US cities. Returns total homeless, sheltered vs unsheltered, chronic homelessness, veterans, families, unaccompanied youth, per-capita rates, and year-over-year trends.
+
+${listHomelessCities().length} cities available. Data from January 2024 PIT count (AHAR Part 1).`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Los Angeles', 'Seattle')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryHomelessness(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Homelessness\n\n${formatHomelessnessResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool: query_cost_of_living ---
+  server.registerTool(
+    "query_cost_of_living",
+    {
+      title: "Query Cost of Living (CPI)",
+      description: `Consumer Price Index data by metro area from the Bureau of Labor Statistics. Shows overall inflation rate and breakdown by category: food, housing, transportation, medical care, and energy.
+
+${listCpiCities().length} metros available. Includes year-over-year inflation rates and monthly trend data.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'NYC', 'Chicago')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryCpi(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Cost of Living (CPI)\n\n${formatCpiResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool: query_migration ---
+  server.registerTool(
+    "query_migration",
+    {
+      title: "Query Population Migration & Mobility",
+      description: `Census geographic mobility data showing population movement patterns. Returns what percentage of a city's population moved in from a different state or abroad in the past year, vs stayed in the same house.
+
+Works for any US city (~30,000 places). Uses ACS 5-Year estimates, Table B07003.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Austin', 'Boise')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryMigration(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Migration & Mobility\n\n${formatMigrationResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
   return server;
+}
+
+// ── REST API helpers ────────────────────────────────────────────────────────
+
+/** Extract :city param safely (Express v5 params can be string | string[]) */
+function cityParam(req: express.Request): string {
+  const raw = req.params.city;
+  return Array.isArray(raw) ? raw[0] : raw;
+}
+
+function safeHandler(fn: (city: string, req: express.Request) => Promise<unknown>) {
+  return async (req: express.Request, res: express.Response) => {
+    try {
+      const city = cityParam(req);
+      const data = await fn(city, req);
+      res.json({ data });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: message });
+    }
+  };
+}
+
+/** Create Express router with all REST API endpoints for the dashboard UI */
+function createApiRouter(): express.Router {
+  const router = express.Router();
+
+  // City list
+  router.get("/cities", (_req, res) => {
+    const citySet = new Set<string>();
+    for (const c of listCities()) citySet.add(c.name);
+    for (const c of listFredCities()) citySet.add(c.name);
+    for (const c of listBlsCities()) citySet.add(c.name);
+    for (const c of listFbiCities()) citySet.add(c.name);
+    for (const c of list311Cities()) citySet.add(c.name);
+    for (const c of listTransitCities()) citySet.add(c.name);
+    for (const c of listSchoolCities()) citySet.add(c.name);
+    for (const c of listPermitCities()) citySet.add(c.name);
+    for (const c of listBudgetCities()) citySet.add(c.name);
+    for (const c of listTrafficCities()) citySet.add(c.name);
+    const majorCities = [
+      "New York", "Los Angeles", "Chicago", "Houston", "Phoenix",
+      "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose",
+      "Austin", "Jacksonville", "Columbus", "Indianapolis",
+      "Charlotte", "San Francisco", "Seattle", "Denver", "Nashville",
+      "Oklahoma City", "Boston", "Portland", "Las Vegas", "Memphis",
+      "Louisville", "Baltimore", "Milwaukee", "Albuquerque", "Tucson",
+      "Fresno", "Sacramento", "Kansas City", "Atlanta", "Omaha",
+      "Raleigh", "Virginia Beach", "Miami", "Minneapolis",
+      "Tampa", "New Orleans", "Cleveland", "Pittsburgh",
+      "St. Louis", "Cincinnati", "Orlando", "Salt Lake City",
+      "Richmond", "Birmingham", "Buffalo", "Boise",
+      "Honolulu", "Anchorage", "Madison", "Des Moines",
+    ];
+    for (const c of majorCities) citySet.add(c);
+    res.json({ data: Array.from(citySet).sort() });
+  });
+
+  // Data endpoints
+  router.get("/census/:city", safeHandler(async (city) => queryCensus(city)));
+  router.get("/economics/:city", safeHandler(async (city) => {
+    const match = resolveFredCity(city);
+    if (!match) throw new Error(`City "${city}" not found in FRED data`);
+    return queryFred(match.key);
+  }));
+  router.get("/employment/:city", safeHandler(async (city) => {
+    const match = resolveBlsCity(city);
+    if (!match) throw new Error(`City "${city}" not found in BLS data`);
+    return queryBls(match.key);
+  }));
+  router.get("/crime/:city", safeHandler(async (city) => {
+    const match = await resolveFbiCityAsync(city);
+    if (!match) throw new Error(`City "${city}" not found in FBI data`);
+    return queryFbiCrime(match.config.state, match.key);
+  }));
+  router.get("/traffic/:city", safeHandler(async (city) => queryTraffic(city)));
+  router.get("/weather/:city", safeHandler(async (city) => queryWeather(city)));
+  router.get("/housing/:city", safeHandler(async (city) => queryHud(city)));
+  router.get("/air-quality/:city", safeHandler(async (city) => queryAirQuality(city)));
+  router.get("/water/:city", safeHandler(async (city) => queryWater(city)));
+  router.get("/representatives/:city", safeHandler(async (city) => queryCivic(city)));
+  router.get("/311/:city", safeHandler(async (city, req) => {
+    const days = parseInt(req.query.days as string) || 90;
+    return query311Trends(city, days);
+  }));
+  router.get("/transit/:city", safeHandler(async (city) => queryTransit(city)));
+  router.get("/schools/:city", safeHandler(async (city) => querySchools(city)));
+  router.get("/permits/:city", safeHandler(async (city) => queryPermits(city)));
+  router.get("/budget/:city", safeHandler(async (city) => queryBudget(city)));
+  router.get("/briefing/:city", safeHandler(async (city) => buildCityBriefing(city)));
+  router.get("/changes/:city", safeHandler(async (city) => trackCityChanges(city)));
+
+  // New data sources
+  router.get("/public-health/:city", safeHandler(async (city) => queryPublicHealth(city)));
+  router.get("/homelessness/:city", safeHandler(async (city) => queryHomelessness(city)));
+  router.get("/cost-of-living/:city", safeHandler(async (city) => queryCpi(city)));
+  router.get("/migration/:city", safeHandler(async (city) => queryMigration(city)));
+
+  return router;
 }
 
 /**
@@ -901,103 +1122,91 @@ Returns a directional dashboard: each metric tagged as improving, declining, or 
  * - --http flag or PORT env var: HTTP mode — for remote deployment (Vercel, Railway, etc.)
  */
 async function main() {
-  const server = await createMcpServer();
   const useHttp = process.argv.includes("--http") || !!process.env.PORT;
 
   if (useHttp) {
-    // HTTP mode: Streamable HTTP transport for remote access
+    // HTTP mode: Express serves both MCP + REST API
     const port = parseInt(process.env.PORT || "3000", 10);
+    const app = express();
+    app.use(cors({ origin: true }));
 
-    // Store transports by session ID for stateful connections
-    const transports = new Map<string, StreamableHTTPServerTransport>();
-
-    const httpServer = createServer(async (req, res) => {
-      // CORS headers for remote access
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, mcp-session-id");
-      res.setHeader("Access-Control-Expose-Headers", "mcp-session-id");
-
-      if (req.method === "OPTIONS") {
-        res.writeHead(204);
-        res.end();
-        return;
-      }
-
-      // Health check
-      if (req.url === "/health") {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ status: "ok", server: "city-data-mcp", version: "0.2.0" }));
-        return;
-      }
-
-      // MCP endpoint
-      if (req.url === "/mcp") {
-        const sessionId = req.headers["mcp-session-id"] as string | undefined;
-
-        if (req.method === "POST") {
-          // Check for existing session
-          let transport = sessionId ? transports.get(sessionId) : undefined;
-
-          if (!transport) {
-            // New session — create transport and connect
-            transport = new StreamableHTTPServerTransport({
-              sessionIdGenerator: () => crypto.randomUUID(),
-            });
-
-            transport.onclose = () => {
-              const sid = (transport as any).sessionId;
-              if (sid) transports.delete(sid);
-            };
-
-            await server.connect(transport);
-
-            // Store by session ID after connection
-            const newSessionId = (transport as any).sessionId;
-            if (newSessionId) transports.set(newSessionId, transport);
-          }
-
-          await transport.handleRequest(req, res);
-          return;
-        }
-
-        if (req.method === "GET") {
-          // SSE stream for server-initiated messages
-          const transport = sessionId ? transports.get(sessionId) : undefined;
-          if (transport) {
-            await transport.handleRequest(req, res);
-            return;
-          }
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "No session found. Send a POST first." }));
-          return;
-        }
-
-        if (req.method === "DELETE") {
-          // Close session
-          const transport = sessionId ? transports.get(sessionId) : undefined;
-          if (transport) {
-            await transport.handleRequest(req, res);
-            transports.delete(sessionId!);
-            return;
-          }
-          res.writeHead(404);
-          res.end();
-          return;
-        }
-      }
-
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Not found. Use /mcp for MCP protocol or /health for status." }));
+    // Health check
+    app.get("/health", (_req, res) => {
+      res.json({ status: "ok", server: "city-data-mcp", version: "0.2.0" });
     });
 
-    httpServer.listen(port, () => {
+    // ── REST API for Dashboard UI ───────────────────────────────────────
+    app.use("/api", createApiRouter());
+
+    // ── MCP Protocol Endpoint ───────────────────────────────────────────
+    // Per-session MCP server + transport pairs (upstream pattern)
+    const sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: McpServer }>();
+
+    // MCP POST — tool calls & initialization
+    app.post("/mcp", async (req, res) => {
+      const sessionId = req.headers["mcp-session-id"] as string | undefined;
+      let session = sessionId ? sessions.get(sessionId) : undefined;
+
+      if (!session) {
+        // New session — create a fresh server + transport pair
+        const sessionServer = await createMcpServer();
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => crypto.randomUUID(),
+        });
+        transport.onclose = () => {
+          const sid = (transport as any).sessionId;
+          if (sid) sessions.delete(sid);
+        };
+        await sessionServer.connect(transport);
+        session = { transport, server: sessionServer };
+
+        // Handle request first — assigns session ID
+        await transport.handleRequest(req, res);
+        const assignedId = (transport as any).sessionId;
+        if (assignedId) sessions.set(assignedId, session);
+        return;
+      }
+
+      await session.transport.handleRequest(req, res);
+    });
+
+    // MCP GET — SSE stream for server-initiated messages
+    app.get("/mcp", async (req, res) => {
+      const sessionId = req.headers["mcp-session-id"] as string | undefined;
+      const session = sessionId ? sessions.get(sessionId) : undefined;
+      if (session) {
+        await session.transport.handleRequest(req, res);
+        return;
+      }
+      res.status(400).json({ error: "No session found. Send a POST first." });
+    });
+
+    // MCP DELETE — close session
+    app.delete("/mcp", async (req, res) => {
+      const sessionId = req.headers["mcp-session-id"] as string | undefined;
+      const session = sessionId ? sessions.get(sessionId) : undefined;
+      if (session) {
+        await session.transport.handleRequest(req, res);
+        sessions.delete(sessionId!);
+        return;
+      }
+      res.status(404).end();
+    });
+
+    // 404 fallback
+    app.use((_req, res) => {
+      res.status(404).json({ error: "Not found. Use /mcp for MCP, /api for REST, or /health for status." });
+    });
+
+    app.listen(port, () => {
       console.error(`[city-data-mcp] HTTP server running on port ${port}`);
       console.error(`[city-data-mcp] MCP endpoint: http://localhost:${port}/mcp`);
+      console.error(`[city-data-mcp] REST API:     http://localhost:${port}/api/cities`);
       console.error(`[city-data-mcp] Health check: http://localhost:${port}/health`);
     });
   } else {
     // Stdio mode: for Claude Code / Claude Desktop (local)
+    const server = await createMcpServer();
     const transport = new StdioServerTransport();
     await server.connect(transport);
     console.error("[city-data-mcp] Server started in stdio mode, waiting for requests...");

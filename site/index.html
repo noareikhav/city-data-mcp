@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>City Data MCP — How We Built It</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3a;
+    --text: #e4e4ed;
+    --text-dim: #8888a0;
+    --accent: #6c63ff;
+    --accent-glow: rgba(108, 99, 255, 0.15);
+    --green: #34d399;
+    --amber: #fbbf24;
+    --rose: #f87171;
+    --blue: #60a5fa;
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* --- NAV --- */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(10, 10, 15, 0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+  }
+  nav .nav-inner {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px;
+  }
+  nav .logo { font-weight: 700; font-size: 0.95rem; color: var(--accent); letter-spacing: -0.02em; }
+  nav .nav-links { display: flex; gap: 1.5rem; }
+  nav .nav-links a {
+    color: var(--text-dim); text-decoration: none; font-size: 0.85rem;
+    transition: color 0.2s;
+  }
+  nav .nav-links a:hover { color: var(--text); }
+
+  /* --- HERO --- */
+  .hero {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 6rem 2rem 4rem;
+    background: radial-gradient(ellipse at 50% 30%, var(--accent-glow) 0%, transparent 60%);
+  }
+  .hero-content { max-width: 720px; }
+  .hero h1 {
+    font-size: clamp(2.5rem, 6vw, 4rem); font-weight: 800;
+    letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero p { font-size: 1.15rem; color: var(--text-dim); max-width: 540px; margin: 0 auto 2rem; }
+  .hero-stats {
+    display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap; margin-top: 2.5rem;
+  }
+  .stat { text-align: center; }
+  .stat-num { font-size: 2.5rem; font-weight: 800; color: var(--accent); }
+  .stat-label { font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* --- SECTIONS --- */
+  section {
+    max-width: 1200px; margin: 0 auto; padding: 5rem 2rem;
+  }
+  .section-label {
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--accent); margin-bottom: 0.75rem; font-weight: 600;
+  }
+  section h2 {
+    font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 800;
+    letter-spacing: -0.02em; margin-bottom: 1rem;
+  }
+  section .subtitle {
+    font-size: 1.05rem; color: var(--text-dim); max-width: 640px; margin-bottom: 3rem;
+  }
+
+  /* --- TIMELINE --- */
+  .timeline { position: relative; padding-left: 2.5rem; }
+  .timeline::before {
+    content: ''; position: absolute; left: 0.7rem; top: 0.5rem; bottom: 0.5rem;
+    width: 2px; background: var(--border);
+  }
+  .timeline-item { position: relative; margin-bottom: 2.5rem; }
+  .timeline-dot {
+    position: absolute; left: -2.15rem; top: 0.35rem;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+  }
+  .timeline-item h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem; }
+  .timeline-item .time { font-size: 0.8rem; color: var(--accent); margin-bottom: 0.5rem; }
+  .timeline-item p { color: var(--text-dim); font-size: 0.95rem; }
+  .timeline-item .prompt {
+    margin-top: 0.75rem; padding: 0.75rem 1rem;
+    background: var(--surface2); border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: 0.85rem; color: var(--text); font-style: italic;
+  }
+  .timeline-item .prompt::before { content: 'Noa: '; font-weight: 700; font-style: normal; color: var(--accent); }
+
+  /* --- CARDS GRID --- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.25rem; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.5rem;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .card p { font-size: 0.85rem; color: var(--text-dim); }
+  .card .badge {
+    display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px;
+    font-size: 0.7rem; font-weight: 600; margin-bottom: 0.5rem;
+  }
+  .badge-green { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+  .badge-amber { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+  .badge-blue { background: rgba(96, 165, 250, 0.15); color: var(--blue); }
+  .badge-rose { background: rgba(248, 113, 113, 0.15); color: var(--rose); }
+
+  /* --- DATA SOURCE TABLE --- */
+  .source-table {
+    width: 100%; border-collapse: collapse; margin-top: 1rem;
+  }
+  .source-table th, .source-table td {
+    text-align: left; padding: 0.75rem 1rem; font-size: 0.85rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .source-table th {
+    color: var(--text-dim); font-weight: 600; text-transform: uppercase;
+    font-size: 0.7rem; letter-spacing: 0.08em;
+  }
+  .source-table tr:hover td { background: var(--surface2); }
+  .coverage-bar {
+    display: inline-block; height: 6px; border-radius: 3px;
+    background: var(--accent); min-width: 4px;
+  }
+  .coverage-any { background: var(--green); }
+
+  /* --- APPROACH CARDS --- */
+  .approach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem; }
+  .approach-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.75rem;
+  }
+  .approach-card .num {
+    font-size: 2rem; font-weight: 800; color: var(--accent); opacity: 0.4;
+    margin-bottom: 0.5rem;
+  }
+  .approach-card h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
+  .approach-card p { font-size: 0.85rem; color: var(--text-dim); }
+
+  /* --- ARCHITECTURE DIAGRAM --- */
+  .arch-diagram {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 2rem;
+    text-align: center; margin: 2rem 0;
+  }
+  .arch-layers { display: flex; flex-direction: column; gap: 1rem; align-items: center; }
+  .arch-layer {
+    display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;
+    padding: 1rem; border-radius: 8px; width: 100%; max-width: 800px;
+  }
+  .arch-layer.claude { background: rgba(108, 99, 255, 0.1); border: 1px solid rgba(108, 99, 255, 0.3); }
+  .arch-layer.tools { background: rgba(96, 165, 250, 0.08); border: 1px solid rgba(96, 165, 250, 0.2); }
+  .arch-layer.sources { background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.2); }
+  .arch-layer.geo { background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.2); }
+  .arch-label {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
+    font-weight: 700; width: 100%; margin-bottom: 0.25rem;
+  }
+  .arch-chip {
+    font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 4px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  }
+  .arch-arrow { font-size: 1.5rem; color: var(--text-dim); }
+
+  /* --- IDEA WALL --- */
+  .wall-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem; margin-top: 2rem;
+  }
+  .sticky {
+    padding: 1.25rem; border-radius: 8px; font-size: 0.85rem;
+    min-height: 120px; position: relative;
+    transform: rotate(var(--rot, 0deg));
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .sticky .author {
+    position: absolute; bottom: 0.75rem; right: 0.75rem;
+    font-size: 0.7rem; opacity: 0.6;
+  }
+  .sticky-yellow { background: #fef3c7; color: #92400e; --rot: -1deg; }
+  .sticky-pink { background: #fce7f3; color: #9d174d; --rot: 1.5deg; }
+  .sticky-green { background: #d1fae5; color: #065f46; --rot: -0.5deg; }
+  .sticky-blue { background: #dbeafe; color: #1e40af; --rot: 1deg; }
+  .sticky-purple { background: #ede9fe; color: #5b21b6; --rot: -1.5deg; }
+
+  .add-sticky {
+    padding: 1.25rem; border-radius: 8px; min-height: 120px;
+    border: 2px dashed var(--border); background: transparent;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer; transition: border-color 0.2s;
+    color: var(--text-dim); font-size: 0.9rem;
+  }
+  .add-sticky:hover { border-color: var(--accent); color: var(--text); }
+  .add-sticky .plus { font-size: 2rem; line-height: 1; margin-bottom: 0.5rem; }
+
+  /* --- MODAL --- */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    z-index: 200; align-items: center; justify-content: center; padding: 2rem;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 2rem; max-width: 480px; width: 100%;
+  }
+  .modal h3 { margin-bottom: 1rem; }
+  .modal textarea {
+    width: 100%; min-height: 100px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.75rem; color: var(--text); font-size: 0.9rem;
+    resize: vertical; font-family: inherit;
+  }
+  .modal input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.6rem 0.75rem; color: var(--text); font-size: 0.9rem;
+    margin-top: 0.75rem; font-family: inherit;
+  }
+  .modal .color-picks {
+    display: flex; gap: 0.5rem; margin-top: 0.75rem;
+  }
+  .color-pick {
+    width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: border-color 0.2s;
+  }
+  .color-pick.selected, .color-pick:hover { border-color: var(--text); }
+  .modal-actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; justify-content: flex-end; }
+  .btn {
+    padding: 0.5rem 1.25rem; border-radius: 8px; font-size: 0.85rem;
+    font-weight: 600; cursor: pointer; border: none; transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+
+  /* --- CONNECT / TRY IT --- */
+  .connect-tabs {
+    display: flex; gap: 0; margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border);
+  }
+  .connect-tab {
+    padding: 0.75rem 1.5rem; font-size: 0.9rem; font-weight: 600;
+    color: var(--text-dim); cursor: pointer; border: none; background: none;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .connect-tab:hover { color: var(--text); }
+  .connect-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .connect-panel { display: none; }
+  .connect-panel.active { display: block; }
+  .connect-block {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.75rem; margin-bottom: 1.25rem;
+  }
+  .connect-block h3 {
+    font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;
+  }
+  .connect-block .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--accent);
+    color: white; font-size: 0.75rem; font-weight: 700; margin-right: 0.5rem;
+    flex-shrink: 0;
+  }
+  .connect-block .step-row {
+    display: flex; align-items: flex-start; gap: 0; margin-bottom: 0.75rem;
+  }
+  .connect-block .step-row h3 { margin-bottom: 0; }
+  .connect-block p, .connect-block li {
+    font-size: 0.85rem; color: var(--text-dim); line-height: 1.6;
+  }
+  .connect-block ul { padding-left: 1rem; margin: 0.5rem 0; }
+  .connect-block li { margin-bottom: 0.25rem; }
+  .connect-block a { color: var(--accent); text-decoration: none; }
+  .connect-block a:hover { text-decoration: underline; }
+  .code-block {
+    position: relative; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1rem 1.25rem; margin-top: 0.75rem;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.8rem; line-height: 1.7; overflow-x: auto;
+    color: var(--text); white-space: pre;
+  }
+  .copy-btn {
+    position: absolute; top: 0.5rem; right: 0.5rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0.3rem 0.6rem;
+    font-size: 0.7rem; color: var(--text-dim); cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+  .key-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.75rem; margin-top: 0.75rem;
+  }
+  .key-card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.75rem 1rem; font-size: 0.8rem;
+  }
+  .key-card strong { color: var(--text); display: block; margin-bottom: 0.15rem; }
+  .key-card a { font-size: 0.75rem; }
+  .key-card .tag {
+    display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.35rem;
+    border-radius: 3px; font-weight: 600; margin-left: 0.35rem;
+  }
+  .tag-required { background: rgba(248, 113, 113, 0.15); color: var(--rose); }
+  .tag-optional { background: rgba(255,255,255,0.06); color: var(--text-dim); }
+  .connect-note {
+    background: rgba(108, 99, 255, 0.08); border: 1px solid rgba(108, 99, 255, 0.2);
+    border-radius: 8px; padding: 1rem 1.25rem; margin-top: 1rem;
+    font-size: 0.85rem; color: var(--text-dim);
+  }
+  .connect-note strong { color: var(--text); }
+
+  /* --- FOOTER --- */
+  footer {
+    text-align: center; padding: 3rem 2rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim); font-size: 0.85rem;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  /* --- RESPONSIVE --- */
+  @media (max-width: 640px) {
+    nav .nav-links { display: none; }
+    .hero-stats { gap: 1.5rem; }
+    section { padding: 3rem 1.25rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="logo">city-data-mcp</div>
+    <div class="nav-links">
+      <a href="#story">The Story</a>
+      <a href="#journey">How We Built It</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#tools">Tools</a>
+      <a href="#connect">Try It</a>
+      <a href="#wall">Idea Wall</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-content">
+    <h1>We Built a Civic Data Platform in One Sitting</h1>
+    <p>An MCP server that gives Claude real-time access to 15 public data sources across every US city. Built by a product leader and an AI, pair-programming from scratch.</p>
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-num">22</div><div class="stat-label">Tools</div></div>
+      <div class="stat"><div class="stat-num">15</div><div class="stat-label">Data Sources</div></div>
+      <div class="stat"><div class="stat-num">30K+</div><div class="stat-label">US Cities</div></div>
+      <div class="stat"><div class="stat-num">1</div><div class="stat-label">Session</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- THE STORY -->
+<section id="story">
+  <div class="section-label">What We Built</div>
+  <h2>A real-time civic data layer for AI</h2>
+  <p class="subtitle">An MCP server that lets Claude query demographics, economics, crime, housing, weather, transit, schools, budgets, and more — for any US city. Think of it as giving Claude a direct line to every major federal data source.</p>
+
+  <div class="arch-diagram">
+    <div class="arch-layers">
+      <div class="arch-layer claude">
+        <div class="arch-label" style="color: var(--accent);">Claude (AI Layer)</div>
+        <div class="arch-chip">Claude Desktop</div>
+        <div class="arch-chip">Claude Code</div>
+        <div class="arch-chip">Any MCP Client</div>
+      </div>
+      <div class="arch-arrow">&#8595;</div>
+      <div class="arch-layer tools">
+        <div class="arch-label" style="color: var(--blue);">Analysis Tools (5)</div>
+        <div class="arch-chip">City Briefing</div>
+        <div class="arch-chip">Issue Mapper</div>
+        <div class="arch-chip">Change Tracker</div>
+        <div class="arch-chip">Census Cohort</div>
+        <div class="arch-chip">Full Cohort</div>
+      </div>
+      <div class="arch-arrow">&#8595;</div>
+      <div class="arch-layer sources">
+        <div class="arch-label" style="color: var(--green);">Data Tools (15)</div>
+        <div class="arch-chip">Census ACS</div>
+        <div class="arch-chip">FRED</div>
+        <div class="arch-chip">BLS</div>
+        <div class="arch-chip">FBI UCR</div>
+        <div class="arch-chip">NWS</div>
+        <div class="arch-chip">EPA AirNow</div>
+        <div class="arch-chip">HUD</div>
+        <div class="arch-chip">USGS</div>
+        <div class="arch-chip">Google Civic</div>
+        <div class="arch-chip">NTD Transit</div>
+        <div class="arch-chip">NCES Schools</div>
+        <div class="arch-chip">Census BPS</div>
+        <div class="arch-chip">Socrata/311</div>
+        <div class="arch-chip">City Budgets</div>
+      </div>
+      <div class="arch-arrow">&#8595;</div>
+      <div class="arch-layer geo">
+        <div class="arch-label" style="color: var(--amber);">Geo-Resolver (Dynamic)</div>
+        <div class="arch-chip">Census Geocoder</div>
+        <div class="arch-chip">FCC Area API</div>
+        <div class="arch-chip">Any city &#8594; FIPS + ZIP + coords</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW WE BUILT IT -->
+<section id="journey">
+  <div class="section-label">The Journey</div>
+  <h2>How a product leader and an AI built this together</h2>
+  <p class="subtitle">This wasn't a spec handed to engineering. It was a live conversation — exploring, iterating, and shipping. Here's how it unfolded.</p>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="time">Phase 1 — The Spark</div>
+      <h3>Learning what MCP even is</h3>
+      <p>Started with a goal: understand MCP by building one. We entered planning mode — Claude explained the protocol, the architecture, and the mental model. Then we scaffolded a minimal server with one tool (query NYC crime data from Socrata).</p>
+      <div class="prompt">Let's take on a new project. I want to understand exactly what it means and what it takes to build an MCP server, and build one myself.</div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="time">Phase 2 — First Working Tool</div>
+      <h3>Hello world: querying NYC crime data</h3>
+      <p>Connected the server to Claude Desktop. First query: "What are recent crime incidents in NYC?" — Claude called the MCP tool, hit the Socrata API, and returned real data. The mental model clicked.</p>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="time">Phase 3 — Expanding the Vision</div>
+      <h3>From 1 city to 5, from 1 source to 8</h3>
+      <p>Added Census demographics (any US city), FRED economics, BLS employment, FBI crime stats. Each source followed the same pattern — learn the API, write a client, register a tool. The conversation shifted from "how does this work" to "what should we add next."</p>
+      <div class="prompt">Are there other data sources we can add? I want this to be useful for real city comparison.</div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="time">Phase 4 — The Cohort Builder</div>
+      <h3>Finding peer cities by similarity</h3>
+      <p>Built a tool that finds cities similar to any target across multiple dimensions. Then expanded it to pull from ALL data sources — demographics, economics, crime, employment. Two versions: fast (Census-only) and rich (multi-source).</p>
+      <div class="prompt">Maybe a 'create cohort' tool? This tool suggests a list of peer cities based on real data.</div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="time">Phase 5 — Deploy + Share</div>
+      <h3>Live on Railway in minutes</h3>
+      <p>Deployed to Railway with auto-deploy from GitHub. Added HTTP transport mode alongside stdio. Shared with the team via Slack — "look what we can do."</p>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="time">Phase 6 — The Community Voices Bridge</div>
+      <h3>From hard data to resident experience</h3>
+      <p>Asked: "What if we could cross-reference this with community voices data?" This led to 311 trends, transit, schools, permits, and city budgets — the data types that map directly to what residents care about. Then built three analysis tools that bridge the gap.</p>
+      <div class="prompt">What else can we think of? Especially if we're thinking how to cross-reference these data points with community voices data.</div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="time">Phase 7 — Dynamic Resolution</div>
+      <h3>Making it work for ANY city</h3>
+      <p>The big unlock: a shared geo-resolver that turns any city name into coordinates + FIPS codes + ZIP. Now 10 of 15 sources work for any US city — not just the 50 we hardcoded. Critical for Zencity's mid-size city clients.</p>
+      <div class="prompt">Is it possible to do dynamic pulls for specific cities that aren't in the included list? Most of Zencity's clients aren't on these lists.</div>
+    </div>
+  </div>
+</section>
+
+<!-- KEY INSIGHT -->
+<section>
+  <div class="section-label">What We Learned</div>
+  <h2>Working with AI is like working with a developer — but different</h2>
+  <p class="subtitle">The dynamics of the collaboration mattered as much as the output.</p>
+
+  <div class="approach-grid">
+    <div class="approach-card">
+      <div class="num">01</div>
+      <h3>Start with the question, not the spec</h3>
+      <p>We didn't write a PRD. We said "I want to understand MCP" and built from there. The spec emerged from the conversation, not the other way around.</p>
+    </div>
+    <div class="approach-card">
+      <div class="num">02</div>
+      <h3>Iterate in conversation</h3>
+      <p>Every "what if we also..." moment expanded the scope naturally. The cohort builder, the geo-resolver, the analysis tools — all emerged from follow-up questions, not upfront planning.</p>
+    </div>
+    <div class="approach-card">
+      <div class="num">03</div>
+      <h3>Think in layers</h3>
+      <p>First one source, then many sources, then analysis on top, then dynamic resolution underneath. Each layer made the next one possible. You don't need to see the whole architecture upfront.</p>
+    </div>
+    <div class="approach-card">
+      <div class="num">04</div>
+      <h3>Push on coverage, not just features</h3>
+      <p>"Can we expand the city list?" was the question that made this actually useful. Features without coverage are demos. Coverage without features is a database.</p>
+    </div>
+    <div class="approach-card">
+      <div class="num">05</div>
+      <h3>Deploy early, share fast</h3>
+      <p>We deployed to Railway mid-build and shared on Slack immediately. The feedback loop matters more than polish.</p>
+    </div>
+    <div class="approach-card">
+      <div class="num">06</div>
+      <h3>Let the product brain lead</h3>
+      <p>The AI knows APIs and code patterns. You know what's valuable. "Cross-reference with community voices" was a product insight that shaped the entire second half of the build.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE / DATA SOURCES -->
+<section id="architecture">
+  <div class="section-label">Architecture</div>
+  <h2>15 data sources, one unified API</h2>
+  <p class="subtitle">Each source has its own client module. The geo-resolver makes 10 of them work for any US city dynamically.</p>
+
+  <div style="overflow-x: auto;">
+  <table class="source-table">
+    <thead>
+      <tr><th>Source</th><th>Data</th><th>Key?</th><th>Coverage</th><th></th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Census ACS</strong></td><td>Demographics, income, poverty, education, housing, commuting</td><td>Yes</td><td>~30,000 places</td><td><span class="coverage-bar coverage-any" style="width:100%"></span></td></tr>
+      <tr><td><strong>NWS</strong></td><td>Weather, forecast, alerts</td><td>No</td><td>Any US location</td><td><span class="coverage-bar coverage-any" style="width:100%"></span></td></tr>
+      <tr><td><strong>Google Civic</strong></td><td>Elected representatives</td><td>Yes</td><td>Any US address</td><td><span class="coverage-bar coverage-any" style="width:100%"></span></td></tr>
+      <tr><td><strong>EPA AirNow</strong></td><td>Air quality index, forecast</td><td>Yes</td><td>Any US city*</td><td><span class="coverage-bar coverage-any" style="width:90%"></span></td></tr>
+      <tr><td><strong>USGS</strong></td><td>Water: streamflow, gage height, temperature</td><td>No</td><td>Any US city*</td><td><span class="coverage-bar coverage-any" style="width:90%"></span></td></tr>
+      <tr><td><strong>HUD</strong></td><td>Fair Market Rents, income limits</td><td>No</td><td>Any US city*</td><td><span class="coverage-bar coverage-any" style="width:90%"></span></td></tr>
+      <tr><td><strong>Census BPS</strong></td><td>Building permits (5-year trend)</td><td>Yes</td><td>Any US city*</td><td><span class="coverage-bar coverage-any" style="width:90%"></span></td></tr>
+      <tr><td><strong>NCES</strong></td><td>School districts, enrollment, finance</td><td>No</td><td>Any US city*</td><td><span class="coverage-bar coverage-any" style="width:90%"></span></td></tr>
+      <tr><td><strong>FBI UCR</strong></td><td>Crime statistics (agency + state level)</td><td>Yes</td><td>Any US city*</td><td><span class="coverage-bar coverage-any" style="width:85%"></span></td></tr>
+      <tr><td><strong>BLS</strong></td><td>Unemployment, employment, labor force</td><td>No</td><td>56 metros</td><td><span class="coverage-bar" style="width:50%"></span></td></tr>
+      <tr><td><strong>FRED</strong></td><td>Economic indicators, housing index</td><td>Yes</td><td>52 metros</td><td><span class="coverage-bar" style="width:48%"></span></td></tr>
+      <tr><td><strong>NTD</strong></td><td>Transit ridership, service hours</td><td>No</td><td>54 cities</td><td><span class="coverage-bar" style="width:45%"></span></td></tr>
+      <tr><td><strong>Budgets</strong></td><td>City spending by category</td><td>No</td><td>30 cities</td><td><span class="coverage-bar" style="width:25%"></span></td></tr>
+      <tr><td><strong>Socrata 311</strong></td><td>Service request trends</td><td>No</td><td>13 cities</td><td><span class="coverage-bar" style="width:12%"></span></td></tr>
+      <tr><td><strong>Socrata</strong></td><td>Raw crime/311 records</td><td>No</td><td>5 cities</td><td><span class="coverage-bar" style="width:5%"></span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: 1rem;">* Dynamic via geo-resolver: hardcoded fast-path + Census geocoder fallback for any US city</p>
+</section>
+
+<!-- TOOLS -->
+<section id="tools">
+  <div class="section-label">22 Tools</div>
+  <h2>What Claude can do with this</h2>
+  <p class="subtitle">Data tools fetch information. Analysis tools combine multiple sources into insights. Both types are designed to be composed — Claude chains them naturally.</p>
+
+  <h3 style="margin-bottom: 1rem; font-size: 1rem; color: var(--text-dim);">Data Tools</h3>
+  <div class="cards">
+    <div class="card"><span class="badge badge-green">Any City</span><h3>query_demographics</h3><p>Census population, income, poverty, education, housing, commuting</p></div>
+    <div class="card"><span class="badge badge-green">Any City</span><h3>query_weather</h3><p>NWS conditions, forecast, active alerts</p></div>
+    <div class="card"><span class="badge badge-green">Any City</span><h3>query_representatives</h3><p>Elected officials at all levels</p></div>
+    <div class="card"><span class="badge badge-green">Any City</span><h3>query_air_quality</h3><p>EPA AQI readings and forecast</p></div>
+    <div class="card"><span class="badge badge-green">Any City</span><h3>query_housing</h3><p>HUD fair market rents, income limits</p></div>
+    <div class="card"><span class="badge badge-green">Any City</span><h3>query_water</h3><p>USGS real-time streamflow and water data</p></div>
+    <div class="card"><span class="badge badge-green">Any City</span><h3>query_permits</h3><p>Building permit trends (5-year)</p></div>
+    <div class="card"><span class="badge badge-green">Any City</span><h3>query_schools</h3><p>Districts, enrollment, finance, ratios</p></div>
+    <div class="card"><span class="badge badge-green">Any City</span><h3>query_national_crime</h3><p>FBI crime stats (agency or state level)</p></div>
+    <div class="card"><span class="badge badge-blue">50+ Metros</span><h3>query_economics</h3><p>FRED unemployment, housing index, income</p></div>
+    <div class="card"><span class="badge badge-blue">56 Metros</span><h3>query_employment</h3><p>BLS unemployment rate, job growth</p></div>
+    <div class="card"><span class="badge badge-blue">54 Cities</span><h3>query_transit</h3><p>NTD ridership by agency and mode</p></div>
+    <div class="card"><span class="badge badge-amber">30 Cities</span><h3>query_budget</h3><p>City spending by category, per-capita</p></div>
+    <div class="card"><span class="badge badge-amber">13 Cities</span><h3>query_311_trends</h3><p>Top complaint categories, monthly trends</p></div>
+    <div class="card"><span class="badge badge-amber">5 Cities</span><h3>query_city_data</h3><p>Raw Socrata crime/311 records</p></div>
+    <div class="card"><h3>compare_demographics</h3><p>Side-by-side Census comparison</p></div>
+    <div class="card"><h3>list_available_data</h3><p>Discovery: what data exists for which cities</p></div>
+  </div>
+
+  <h3 style="margin: 2.5rem 0 1rem; font-size: 1rem; color: var(--text-dim);">Analysis Tools</h3>
+  <div class="cards">
+    <div class="card" style="border-color: var(--accent);">
+      <span class="badge badge-rose">Multi-Source</span>
+      <h3>create_city_briefing</h3>
+      <p>Pulls ALL 14 sources in parallel. Returns a structured executive brief: demographics, economy, housing, safety, quality of life, government, community voice.</p>
+    </div>
+    <div class="card" style="border-color: var(--accent);">
+      <span class="badge badge-rose">Cross-Reference</span>
+      <h3>map_issue_data</h3>
+      <p>"Residents say X — here's what the data shows." Maps 9 community issue topics to relevant hard data across all sources.</p>
+    </div>
+    <div class="card" style="border-color: var(--accent);">
+      <span class="badge badge-rose">Trends</span>
+      <h3>track_city_changes</h3>
+      <p>Directional dashboard: what's improving, declining, or stable. Tags each metric with direction + supporting data.</p>
+    </div>
+    <div class="card" style="border-color: var(--accent);">
+      <span class="badge badge-rose">Peer Analysis</span>
+      <h3>create_full_cohort</h3>
+      <p>Find peer cities across 12 dimensions from 4 sources. Criteria: balanced, economics, livability, safety, growth, affordability.</p>
+    </div>
+    <div class="card" style="border-color: var(--accent);">
+      <span class="badge badge-rose">Fast Peers</span>
+      <h3>create_census_cohort</h3>
+      <p>Quick demographic peer matching. 75-city pool, 7 criteria presets. Census-only — fast results.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CONNECT / TRY IT -->
+<section id="connect">
+  <div class="section-label">Try It</div>
+  <h2>Connect in 5 minutes</h2>
+  <p class="subtitle">Two ways to get city data flowing into Claude. Pick whichever you use.</p>
+
+  <div class="connect-tabs">
+    <button class="connect-tab active" onclick="switchTab('desktop')">Claude Desktop</button>
+    <button class="connect-tab" onclick="switchTab('code')">Claude Code (CLI)</button>
+  </div>
+
+  <!-- CLAUDE DESKTOP PANEL -->
+  <div class="connect-panel active" id="panel-desktop">
+    <div class="connect-block">
+      <div class="step-row"><span class="step-num">1</span><h3>Clone & build</h3></div>
+      <div class="code-block"><button class="copy-btn" onclick="copyBlock(this)">Copy</button>git clone https://github.com/zencity-product/city-data-mcp.git
+cd city-data-mcp
+npm install && npm run build</div>
+    </div>
+
+    <div class="connect-block">
+      <div class="step-row"><span class="step-num">2</span><h3>Get API keys</h3></div>
+      <p>Two required keys (free, instant signup). The rest are optional and unlock more data sources.</p>
+      <div class="key-grid">
+        <div class="key-card"><strong>Census API <span class="tag tag-required">Required</span></strong>Demographics, permits, housing<br><a href="https://api.census.gov/data/key_signup.html" target="_blank">Get key &rarr;</a></div>
+        <div class="key-card"><strong>FRED API <span class="tag tag-required">Required</span></strong>Economics, unemployment, housing index<br><a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank">Get key &rarr;</a></div>
+        <div class="key-card"><strong>AirNow API <span class="tag tag-optional">Optional</span></strong>Air quality index & forecasts<br><a href="https://docs.airnowapi.org/account/request/" target="_blank">Get key &rarr;</a></div>
+        <div class="key-card"><strong>Google Civic <span class="tag tag-optional">Optional</span></strong>Elected representatives<br><a href="https://console.cloud.google.com/apis/credentials" target="_blank">Get key &rarr;</a></div>
+      </div>
+    </div>
+
+    <div class="connect-block">
+      <div class="step-row"><span class="step-num">3</span><h3>Add to Claude Desktop config</h3></div>
+      <p>Open <strong>Settings &rarr; Developer &rarr; Edit Config</strong> in Claude Desktop, then paste:</p>
+      <div class="code-block"><button class="copy-btn" onclick="copyBlock(this)">Copy</button>{
+  "mcpServers": {
+    "city-data-mcp": {
+      "command": "node",
+      "args": ["/FULL/PATH/TO/city-data-mcp/dist/index.js"],
+      "env": {
+        "CENSUS_API_KEY": "your-key-here",
+        "FRED_API_KEY": "your-key-here"
+      }
+    }
+  }
+}</div>
+      <p style="margin-top: 0.5rem;">Replace <code style="background:var(--surface2);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.8rem;">/FULL/PATH/TO/</code> with where you cloned the repo.</p>
+    </div>
+
+    <div class="connect-block">
+      <div class="step-row"><span class="step-num">4</span><h3>Restart Claude &amp; go</h3></div>
+      <p>Quit and reopen Claude Desktop. You should see the city-data-mcp tools in the hammer icon. Try:</p>
+      <div class="code-block" style="font-family: inherit; font-style: italic; color: var(--text-dim);">"Compare demographics for Denver, Austin, and Portland"
+"Create a full city briefing for San Antonio"
+"What are the economic trends for the Seattle metro?"</div>
+    </div>
+  </div>
+
+  <!-- CLAUDE CODE PANEL -->
+  <div class="connect-panel" id="panel-code">
+    <div class="connect-block">
+      <div class="step-row"><span class="step-num">1</span><h3>Clone & build</h3></div>
+      <div class="code-block"><button class="copy-btn" onclick="copyBlock(this)">Copy</button>git clone https://github.com/zencity-product/city-data-mcp.git
+cd city-data-mcp
+npm install && npm run build</div>
+    </div>
+
+    <div class="connect-block">
+      <div class="step-row"><span class="step-num">2</span><h3>Get API keys</h3></div>
+      <p>Same as above — two required, rest optional.</p>
+      <div class="key-grid">
+        <div class="key-card"><strong>Census API <span class="tag tag-required">Required</span></strong><a href="https://api.census.gov/data/key_signup.html" target="_blank">Get key &rarr;</a></div>
+        <div class="key-card"><strong>FRED API <span class="tag tag-required">Required</span></strong><a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank">Get key &rarr;</a></div>
+      </div>
+    </div>
+
+    <div class="connect-block">
+      <div class="step-row"><span class="step-num">3</span><h3>Add via CLI</h3></div>
+      <p>Run this from any project where you want city data available:</p>
+      <div class="code-block"><button class="copy-btn" onclick="copyBlock(this)">Copy</button>claude mcp add city-data-mcp \
+  -e CENSUS_API_KEY=your-key-here \
+  -e FRED_API_KEY=your-key-here \
+  -- node /FULL/PATH/TO/city-data-mcp/dist/index.js</div>
+      <p style="margin-top: 0.75rem;"><strong>Or</strong> add it to your project's <code style="background:var(--surface2);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.8rem;">.mcp.json</code>:</p>
+      <div class="code-block"><button class="copy-btn" onclick="copyBlock(this)">Copy</button>{
+  "mcpServers": {
+    "city-data-mcp": {
+      "command": "node",
+      "args": ["/FULL/PATH/TO/city-data-mcp/dist/index.js"],
+      "env": {
+        "CENSUS_API_KEY": "your-key-here",
+        "FRED_API_KEY": "your-key-here"
+      }
+    }
+  }
+}</div>
+    </div>
+
+    <div class="connect-block">
+      <div class="step-row"><span class="step-num">4</span><h3>Start using it</h3></div>
+      <p>The tools are immediately available. Just ask Claude:</p>
+      <div class="code-block" style="font-family: inherit; font-style: italic; color: var(--text-dim);">"Create a city briefing for Memphis"
+"Find peer cities for Boulder based on demographics and economics"
+"What's the air quality and weather in Phoenix right now?"</div>
+    </div>
+  </div>
+
+  <div class="connect-note">
+    <strong>Already deployed remotely?</strong> The server also supports HTTP mode for shared access. Run with <code style="background:var(--surface2);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.8rem;">--http</code> flag or set the <code style="background:var(--surface2);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.8rem;">PORT</code> env var. See the <a href="https://github.com/zencity-product/city-data-mcp" target="_blank">README</a> for details.
+  </div>
+</section>
+
+<!-- IDEA WALL -->
+<section id="wall">
+  <div class="section-label">Your Turn</div>
+  <h2>What should we build with this?</h2>
+  <p class="subtitle">Add your ideas. What tools would you add? What data is missing? How would you use this for clients? What integrations make sense?</p>
+
+  <div class="wall-grid" id="wallGrid">
+    <!-- Seed stickies -->
+    <div class="sticky sticky-yellow">
+      What if we could pipe Zencity survey results through the issue mapper? "Housing affordability" sentiment → hard data comparison.
+      <span class="author">Noa</span>
+    </div>
+    <div class="sticky sticky-pink">
+      Build a "city health score" that composites all the data into a single 0-100 rating. Use it in QBRs.
+      <span class="author">Idea seed</span>
+    </div>
+    <div class="sticky sticky-green">
+      Auto-generate a competitive brief for sales: "Here's how your city compares to 5 similar cities on the metrics that matter."
+      <span class="author">Idea seed</span>
+    </div>
+    <div class="sticky sticky-blue">
+      Connect to Zencity's API — when a city's sentiment drops on a topic, automatically pull the relevant hard data to investigate.
+      <span class="author">Idea seed</span>
+    </div>
+    <!-- User stickies loaded here -->
+    <div class="add-sticky" onclick="openModal()">
+      <div class="plus">+</div>
+      Add your idea
+    </div>
+  </div>
+</section>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>Add your idea</h3>
+    <textarea id="ideaText" placeholder="What would you build, add, or use this for?"></textarea>
+    <input id="ideaAuthor" type="text" placeholder="Your name">
+    <div class="color-picks">
+      <div class="color-pick sticky-yellow selected" data-color="yellow" onclick="pickColor(this)" style="background:#fef3c7"></div>
+      <div class="color-pick" data-color="pink" onclick="pickColor(this)" style="background:#fce7f3"></div>
+      <div class="color-pick" data-color="green" onclick="pickColor(this)" style="background:#d1fae5"></div>
+      <div class="color-pick" data-color="blue" onclick="pickColor(this)" style="background:#dbeafe"></div>
+      <div class="color-pick" data-color="purple" onclick="pickColor(this)" style="background:#ede9fe"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addIdea()">Add to Wall</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>Built by Noa Reikhav + Claude &middot; <a href="https://github.com/zencity-product/city-data-mcp" target="_blank">GitHub</a> &middot; Deployed on Railway</p>
+  <p style="margin-top: 0.5rem;">Zencity Product Team &middot; March 2026</p>
+</footer>
+
+<script>
+  // --- Sticky Notes (localStorage) ---
+  let selectedColor = 'yellow';
+  const STORAGE_KEY = 'city-data-mcp-ideas';
+
+  function loadIdeas() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) return;
+      const ideas = JSON.parse(stored);
+      const grid = document.getElementById('wallGrid');
+      const addBtn = grid.querySelector('.add-sticky');
+      ideas.forEach(idea => {
+        const el = createStickyEl(idea.text, idea.author, idea.color);
+        grid.insertBefore(el, addBtn);
+      });
+    } catch {}
+  }
+
+  function saveIdea(text, author, color) {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const ideas = stored ? JSON.parse(stored) : [];
+      ideas.push({ text, author, color, ts: Date.now() });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(ideas));
+    } catch {}
+  }
+
+  function createStickyEl(text, author, color) {
+    const el = document.createElement('div');
+    el.className = `sticky sticky-${color}`;
+    el.innerHTML = `${escapeHtml(text)}<span class="author">${escapeHtml(author)}</span>`;
+    return el;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function openModal() {
+    document.getElementById('modalOverlay').classList.add('active');
+    document.getElementById('ideaText').focus();
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.getElementById('ideaText').value = '';
+    document.getElementById('ideaAuthor').value = '';
+  }
+
+  function pickColor(el) {
+    document.querySelectorAll('.color-pick').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedColor = el.dataset.color;
+  }
+
+  function addIdea() {
+    const text = document.getElementById('ideaText').value.trim();
+    const author = document.getElementById('ideaAuthor').value.trim() || 'Anonymous';
+    if (!text) return;
+
+    const grid = document.getElementById('wallGrid');
+    const addBtn = grid.querySelector('.add-sticky');
+    const el = createStickyEl(text, author, selectedColor);
+    grid.insertBefore(el, addBtn);
+
+    saveIdea(text, author, selectedColor);
+    closeModal();
+  }
+
+  // --- Connect tabs ---
+  function switchTab(tab) {
+    document.querySelectorAll('.connect-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.connect-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector(`.connect-tab[onclick*="${tab}"]`).classList.add('active');
+    document.getElementById(`panel-${tab}`).classList.add('active');
+  }
+
+  function copyBlock(btn) {
+    const block = btn.parentElement;
+    const text = block.textContent.replace('Copy', '').trim();
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+    });
+  }
+
+  // Smooth scroll for nav
+  document.querySelectorAll('nav a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(a.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  loadIdeas();
+</script>
+
+</body>
+</html>

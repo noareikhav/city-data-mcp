@@ -111,6 +111,7 @@
     font-size: 0.85rem; color: var(--text); font-style: italic;
   }
   .timeline-item .prompt::before { content: 'Noa: '; font-weight: 700; font-style: normal; color: var(--accent); }
+  .timeline-item .prompt.maxime::before { content: 'Maxime: '; }
 
   /* --- CARDS GRID --- */
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.25rem; }
@@ -491,6 +492,14 @@
       <h3>Making it work for ANY city</h3>
       <p>The big unlock: a shared geo-resolver that turns any city name into coordinates + FIPS codes + ZIP. Now 10 of 15 sources work for any US city — not just the 50 we hardcoded. Critical for Zencity's mid-size city clients.</p>
       <div class="prompt">Is it possible to do dynamic pulls for specific cities that aren't in the included list? Most of Zencity's clients aren't on these lists.</div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="time">Phase 8 — Going International</div>
+      <h3>Expanding to UK public data</h3>
+      <p>With ~100 Commonplace UK clients, the next question was obvious: can we do the same for the UK? Maxime researched 22 equivalent UK government APIs, then used Claude Code to build and wire up 15 new tools in a single session — ONS demographics, Police UK crime, Land Registry housing, Environment Agency flood monitoring, and more. 10 of 13 UK sources work without any API keys. The same MCP server now covers both US and UK cities.</p>
+      <div class="prompt maxime">We have Commonplace clients in the UK. Can we add the equivalent APIs but for UK public data?</div>
     </div>
   </div>
 </section>

@@ -41,25 +41,27 @@ import { buildCityBriefing, formatBriefing } from "./sources/briefing.js";
 import { queryTraffic, formatTrafficResults, listTrafficCities } from "./sources/traffic.js";
 import { mapIssueData, formatIssueData, listIssueTopics } from "./sources/issue-mapper.js";
 import { trackCityChanges, formatChangeTracker } from "./sources/change-tracker.js";
-// Multi-country adapters
-import { queryDemographics as adapterDemographics } from "./sources/adapters/demographics.js";
-import { queryCrime as adapterCrime } from "./sources/adapters/crime.js";
-import { queryEconomics as adapterEconomics } from "./sources/adapters/economics.js";
-import { queryEmployment as adapterEmployment } from "./sources/adapters/employment.js";
-import { queryWeather as adapterWeather } from "./sources/adapters/weather.js";
-import { queryAirQuality as adapterAirQuality } from "./sources/adapters/air-quality.js";
-import { queryHousing as adapterHousing } from "./sources/adapters/housing.js";
-import { queryWater as adapterWater } from "./sources/adapters/water.js";
-import { queryRepresentatives as adapterRepresentatives } from "./sources/adapters/representatives.js";
-import { querySchools as adapterSchools } from "./sources/adapters/schools.js";
-import { queryTransport as adapterTransport } from "./sources/adapters/transport.js";
-import { queryBudget as adapterBudget } from "./sources/adapters/budget.js";
-import { queryBriefing as adapterBriefing } from "./sources/adapters/briefing.js";
+import { queryPublicHealth, formatPublicHealthResults } from "./sources/cdc-places.js";
+import { queryHomelessness, formatHomelessnessResults, listHomelessCities } from "./sources/homelessness.js";
+import { queryCpi, formatCpiResults, listCpiCities } from "./sources/cpi.js";
+import { queryMigration, formatMigrationResults } from "./sources/migration.js";
 
-// Country parameter schema (reused across tools)
-const countryParam = z.enum(['US', 'UK', 'CA']).optional().describe(
-  "Country code. Auto-detected from city name if omitted. Required for ambiguous cities like London, Birmingham, Richmond, Hamilton, Cambridge, Windsor."
-);
+// UK sources
+import { queryUkCrime, formatUkCrimeResults } from "./sources/uk/crime.js";
+import { queryUkFloodWater, formatUkFloodWaterResults } from "./sources/uk/flood-water.js";
+import { queryUkDemographics, formatUkDemographicsResults, queryUkMigration, formatUkMigrationResults } from "./sources/uk/ons-demographics.js";
+import { queryUkEconomics, formatUkEconomicsResults } from "./sources/uk/economics.js";
+import { queryUkHousing, formatUkHousingResults } from "./sources/uk/housing.js";
+import { queryUkPlanning, formatUkPlanningResults } from "./sources/uk/planning.js";
+import { queryUkSchools, formatUkSchoolsResults } from "./sources/uk/schools.js";
+import { queryUkLocalGovFinance, formatUkLocalGovFinanceResults } from "./sources/uk/local-gov-finance.js";
+import { queryUkAirQuality, formatUkAirQualityResults } from "./sources/uk/air-quality.js";
+import { searchUkDatasets, formatUkDatasetResults } from "./sources/uk/discovery.js";
+import { queryUkWeather, formatUkWeatherResults } from "./sources/uk/weather.js";
+import { queryUkTransport, formatUkTransportResults } from "./sources/uk/transport.js";
+import { queryUkRepresentatives, formatUkRepresentativesResults } from "./sources/uk/representatives.js";
+import { buildUkCityBriefing } from "./sources/uk/briefing.js";
+import { listUkCities } from "./sources/uk/geo-resolver.js";
 
 async function createMcpServer() {
   const server = new McpServer(
@@ -924,6 +926,432 @@ Returns a directional dashboard: each metric tagged as improving, declining, or 
     }
   );
 
+  // --- Tool: query_public_health ---
+  server.registerTool(
+    "query_public_health",
+    {
+      title: "Query Public Health Data",
+      description: `Get public health indicators from CDC PLACES for a US city. Returns 30+ measures including obesity, diabetes, depression, mental health, smoking, binge drinking, insurance coverage, food insecurity, housing insecurity, loneliness, and disability rates.
+
+Data from BRFSS (Behavioral Risk Factor Surveillance System). Covers 500+ US cities. No API key needed.
+
+Great for: understanding community health challenges, anchoring social media health discussions with data.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Austin', 'NYC')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryPublicHealth(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Public Health\n\n${formatPublicHealthResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool: query_homelessness ---
+  server.registerTool(
+    "query_homelessness",
+    {
+      title: "Query Homelessness Data",
+      description: `HUD Point-in-Time (PIT) homelessness counts for US cities. Returns total homeless, sheltered vs unsheltered, chronic homelessness, veterans, families, unaccompanied youth, per-capita rates, and year-over-year trends.
+
+${listHomelessCities().length} cities available. Data from January 2024 PIT count (AHAR Part 1).`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Los Angeles', 'Seattle')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryHomelessness(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Homelessness\n\n${formatHomelessnessResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool: query_cost_of_living ---
+  server.registerTool(
+    "query_cost_of_living",
+    {
+      title: "Query Cost of Living (CPI)",
+      description: `Consumer Price Index data by metro area from the Bureau of Labor Statistics. Shows overall inflation rate and breakdown by category: food, housing, transportation, medical care, and energy.
+
+${listCpiCities().length} metros available. Includes year-over-year inflation rates and monthly trend data.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'NYC', 'Chicago')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryCpi(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Cost of Living (CPI)\n\n${formatCpiResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // --- Tool: query_migration ---
+  server.registerTool(
+    "query_migration",
+    {
+      title: "Query Population Migration & Mobility",
+      description: `Census geographic mobility data showing population movement patterns. Returns what percentage of a city's population moved in from a different state or abroad in the past year, vs stayed in the same house.
+
+Works for any US city (~30,000 places). Uses ACS 5-Year estimates, Table B07003.`,
+      inputSchema: z.object({
+        city: z.string().describe("City name (e.g., 'Denver', 'Austin', 'Boise')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryMigration(args.city);
+        return { content: [{ type: "text" as const, text: `# ${result.city} — Migration & Mobility\n\n${formatMigrationResults(result)}` }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UK DATA SOURCES
+  // ══════════════════════════════════════════════════════════════════════════
+
+  server.registerTool(
+    "query_uk_demographics",
+    {
+      title: "Query UK Demographics",
+      description: `Query UK demographics data for any city or local authority using ONS Census 2021 data and MHCLG Indices of Multiple Deprivation.
+
+Returns population, deprivation index, and available Census data.
+No API key required.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city name (e.g., 'Manchester', 'Birmingham', 'Edinburgh')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkDemographics(args.city);
+        return { content: [{ type: "text" as const, text: formatUkDemographicsResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_crime",
+    {
+      title: "Query UK Crime Data",
+      description: `Query street-level crime data for a UK city using the Police UK API (data.police.uk).
+
+Returns crime counts by category within a 1-mile radius of the city centre.
+Covers England, Wales & Northern Ireland (43 forces). Scotland uses separate reporting.
+No API key required. Monthly updates with ~2 month lag.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city name or postcode (e.g., 'London', 'Manchester', 'SW1A 1AA')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkCrime(args.city);
+        return { content: [{ type: "text" as const, text: formatUkCrimeResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_economics",
+    {
+      title: "Query UK Economics",
+      description: `Query UK economic indicators including Bank of England base rate, CPI inflation, GDP growth, and house price index.
+
+Local labour market data (claimant count, earnings) is available for major cities.
+No API key required.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city name (e.g., 'Leeds', 'Bristol')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkEconomics(args.city);
+        return { content: [{ type: "text" as const, text: formatUkEconomicsResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_housing",
+    {
+      title: "Query UK Housing Data",
+      description: `Query UK housing data including HM Land Registry property transactions and VOA rental statistics.
+
+Returns average prices, transaction counts, and rental market data.
+Covers England & Wales. No API key required.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city name (e.g., 'London', 'Cambridge')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkHousing(args.city);
+        return { content: [{ type: "text" as const, text: formatUkHousingResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_weather",
+    {
+      title: "Query UK Weather",
+      description: `Query UK weather conditions and 5-day forecast using Met Office DataPoint.
+
+Returns current temperature, wind, humidity, and daily forecasts.
+Requires UK_MET_OFFICE_API_KEY (free registration).`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city name (e.g., 'Edinburgh', 'Cardiff')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkWeather(args.city);
+        return { content: [{ type: "text" as const, text: formatUkWeatherResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_air_quality",
+    {
+      title: "Query UK Air Quality",
+      description: `Query UK air quality using DEFRA UK-AIR monitoring network.
+
+Returns Daily Air Quality Index (DAQI 1-10), pollutant readings (PM2.5, NO2, O3).
+DAQI bands: 1-3 Low, 4-6 Moderate, 7-9 High, 10 Very High.
+No API key required.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city name (e.g., 'London', 'Manchester')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkAirQuality(args.city);
+        return { content: [{ type: "text" as const, text: formatUkAirQualityResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_flood_water",
+    {
+      title: "Query UK Flood & Water Monitoring",
+      description: `Query real-time river levels, flow rates, and flood warnings from the Environment Agency.
+
+Returns monitoring station readings within 10km and active flood warnings.
+Covers England only. No API key required.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city name (e.g., 'Leeds', 'York', 'Bristol')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkFloodWater(args.city);
+        return { content: [{ type: "text" as const, text: formatUkFloodWaterResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_schools",
+    {
+      title: "Query UK Schools Data",
+      description: `Query UK school data using GIAS (Get Information About Schools) and DfE Education Statistics.
+
+Returns school counts, Ofsted ratings, and attainment data for a local authority.
+Covers England. No API key required.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city or local authority name (e.g., 'Sheffield', 'Nottingham')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkSchools(args.city);
+        return { content: [{ type: "text" as const, text: formatUkSchoolsResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_planning",
+    {
+      title: "Query UK Planning Data",
+      description: `Query UK planning applications and decisions from the Planning Data API.
+
+Returns recent applications, decisions, and breakdowns by type.
+Covers England. No API key required.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city or local authority name (e.g., 'Oxford', 'Brighton')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkPlanning(args.city);
+        return { content: [{ type: "text" as const, text: formatUkPlanningResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_transport",
+    {
+      title: "Query UK Transport Data",
+      description: `Query UK transport data. For London: TfL tube/bus/rail line status. For other cities: bus operator data via BODS.
+
+London requires UK_TFL_API_KEY (free). National bus data requires UK_BODS_API_KEY (free).`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city name (e.g., 'London', 'Manchester')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkTransport(args.city);
+        return { content: [{ type: "text" as const, text: formatUkTransportResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_budget",
+    {
+      title: "Query UK Local Government Finance",
+      description: `Query UK local government finance data from MHCLG Open Data Communities.
+
+Returns council tax, total expenditure, and spending by service area.
+Covers English local authorities. No API key required.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city or local authority name (e.g., 'Birmingham', 'Liverpool')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkLocalGovFinance(args.city);
+        return { content: [{ type: "text" as const, text: formatUkLocalGovFinanceResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_representatives",
+    {
+      title: "Query UK Elected Representatives",
+      description: `Look up UK Members of Parliament and councillors for a city or postcode.
+
+Uses TheyWorkForYou API. Requires UK_TWFY_API_KEY (free for non-commercial).
+Covers Westminster + devolved parliaments.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city name or postcode (e.g., 'Manchester', 'SW1A 1AA')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkRepresentatives(args.city);
+        return { content: [{ type: "text" as const, text: formatUkRepresentativesResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "query_uk_migration",
+    {
+      title: "Query UK Migration Data",
+      description: `Query UK internal migration and population movement data from ONS.
+
+Note: ONS publishes migration data as annual bulk releases.
+Real-time API access is limited.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city name (e.g., 'Bristol', 'Newcastle')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await queryUkMigration(args.city);
+        return { content: [{ type: "text" as const, text: formatUkMigrationResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "search_uk_datasets",
+    {
+      title: "Search UK Open Data",
+      description: `Search the UK government's open data catalogue (data.gov.uk).
+
+Returns dataset titles, publishers, formats, and links. No API key required.`,
+      inputSchema: z.object({
+        query: z.string().describe("Search query (e.g., 'air quality', 'crime statistics', 'housing')"),
+        limit: z.number().default(10).describe("Maximum results to return (default 10)"),
+      }),
+    },
+    async (args) => {
+      try {
+        const result = await searchUkDatasets(args.query, args.limit);
+        return { content: [{ type: "text" as const, text: formatUkDatasetResults(result) }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    "create_uk_city_briefing",
+    {
+      title: "Create UK City Briefing",
+      description: `Pull data from ALL available UK sources and assemble a comprehensive city briefing.
+
+Covers demographics, economics, housing, crime, air quality, flood monitoring, schools, planning, and local government finance.
+Takes 10-20 seconds as it queries 9+ sources in parallel.
+Some sources (weather, transport, representatives) require API keys.`,
+      inputSchema: z.object({
+        city: z.string().describe("UK city name (e.g., 'London', 'Manchester', 'Edinburgh')"),
+      }),
+    },
+    async (args) => {
+      try {
+        const briefing = await buildUkCityBriefing(args.city);
+        return { content: [{ type: "text" as const, text: briefing }] };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }] };
+      }
+    }
+  );
+
   return server;
 }
 
@@ -1016,6 +1444,12 @@ function createApiRouter(): express.Router {
   router.get("/budget/:city", safeHandler(async (city) => queryBudget(city)));
   router.get("/briefing/:city", safeHandler(async (city) => buildCityBriefing(city)));
   router.get("/changes/:city", safeHandler(async (city) => trackCityChanges(city)));
+
+  // New data sources
+  router.get("/public-health/:city", safeHandler(async (city) => queryPublicHealth(city)));
+  router.get("/homelessness/:city", safeHandler(async (city) => queryHomelessness(city)));
+  router.get("/cost-of-living/:city", safeHandler(async (city) => queryCpi(city)));
+  router.get("/migration/:city", safeHandler(async (city) => queryMigration(city)));
 
   return router;
 }

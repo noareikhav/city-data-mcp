@@ -1,105 +1,170 @@
 /**
- * UK City Briefing — Comprehensive brief from ALL UK data sources.
+ * UK City Briefing — Composite Tool
  *
- * Like the US briefing.ts, pulls from every available UK source in parallel.
- * Each source is fetched independently — failures are skipped gracefully.
+ * Pulls data from all available UK sources for a city and assembles
+ * a structured executive briefing. The "give me everything" tool.
+ *
+ * US equivalent: create_city_briefing
  */
 
-import type { UnifiedGeoResolution } from "../../types.js";
-import { queryONSDemographics, formatONSResults } from "./ons-demographics.js";
-import { queryUKCrime, formatUKCrimeResults } from "./police-crime.js";
-import { queryUKWeather, formatUKWeatherResults } from "./met-office-weather.js";
-import { queryUKAirQuality, formatUKAirQualityResults } from "./defra-air-quality.js";
-import { queryUKWater, formatUKWaterResults } from "./environment-agency-water.js";
-import { queryUKEconomics, formatUKEconomicsResults } from "./ons-economics.js";
-import { queryUKHousing, formatUKHousingResults } from "./ons-housing.js";
-import { queryUKTransport, formatUKTransportResults } from "./dft-transport.js";
-import { queryUKSchools, formatUKSchoolResults } from "./dfe-schools.js";
-import { queryUKRepresentatives, formatUKRepresentativesResults } from "./theyworkforyou-reps.js";
-import { queryUKBudget, formatUKBudgetResults } from "./gov-budget.js";
+import { resolveUkCity } from "./geo-resolver.js";
+import { queryUkCrime, formatUkCrimeResults } from "./crime.js";
+import { queryUkFloodWater, formatUkFloodWaterResults } from "./flood-water.js";
+import { queryUkDemographics, formatUkDemographicsResults } from "./ons-demographics.js";
+import { queryUkEconomics, formatUkEconomicsResults } from "./economics.js";
+import { queryUkHousing, formatUkHousingResults } from "./housing.js";
+import { queryUkSchools, formatUkSchoolsResults } from "./schools.js";
+import { queryUkPlanning, formatUkPlanningResults } from "./planning.js";
+import { queryUkLocalGovFinance, formatUkLocalGovFinanceResults } from "./local-gov-finance.js";
+import { queryUkAirQuality, formatUkAirQualityResults } from "./air-quality.js";
 
-export interface UKCityBriefing {
-  city: string;
-  country: 'UK';
-  generatedAt: string;
-  sections: Array<{ title: string; content: string; source: string }>;
-  dataSources: { available: string[]; unavailable: string[] };
+interface BriefingSection {
+  title: string;
+  content: string;
+  available: boolean;
 }
 
-async function safeQuery<T>(name: string, fn: () => Promise<T>): Promise<{ name: string; result: T | null; error?: string }> {
-  try {
-    const result = await fn();
-    return { name, result };
-  } catch (e) {
-    return { name, result: null, error: e instanceof Error ? e.message : String(e) };
+/**
+ * Build a comprehensive UK city briefing by querying all available sources.
+ * Sources that fail are noted but don't block the overall briefing.
+ */
+export async function buildUkCityBriefing(cityInput: string): Promise<string> {
+  const geo = await resolveUkCity(cityInput);
+
+  const sections: BriefingSection[] = [];
+
+  // Run all queries in parallel, catching individual failures
+  const [demographics, economics, housing, crime, airQuality, floodWater, schools, planning, finance] =
+    await Promise.allSettled([
+      queryUkDemographics(cityInput),
+      queryUkEconomics(cityInput),
+      queryUkHousing(cityInput),
+      queryUkCrime(cityInput),
+      queryUkAirQuality(cityInput),
+      queryUkFloodWater(cityInput),
+      queryUkSchools(cityInput),
+      queryUkPlanning(cityInput),
+      queryUkLocalGovFinance(cityInput),
+    ]);
+
+  // Assemble sections
+  if (demographics.status === "fulfilled") {
+    sections.push({
+      title: "Demographics",
+      content: formatUkDemographicsResults(demographics.value),
+      available: true,
+    });
   }
-}
 
-/**
- * Build a comprehensive UK city briefing.
- */
-export async function buildUKCityBriefing(geo: UnifiedGeoResolution): Promise<UKCityBriefing> {
-  const [demographics, crime, weather, airQuality, water, economics, housing, transport, schools, representatives, budget] = await Promise.all([
-    safeQuery("ONS Demographics", () => queryONSDemographics(geo)),
-    safeQuery("UK Crime", () => queryUKCrime(geo)),
-    safeQuery("Met Office Weather", () => queryUKWeather(geo)),
-    safeQuery("DEFRA Air Quality", () => queryUKAirQuality(geo)),
-    safeQuery("Environment Agency Water", () => queryUKWater(geo)),
-    safeQuery("ONS Economics", () => queryUKEconomics(geo)),
-    safeQuery("ONS Housing", () => queryUKHousing(geo)),
-    safeQuery("DfT Transport", () => queryUKTransport(geo)),
-    safeQuery("DfE Schools", () => queryUKSchools(geo)),
-    safeQuery("TheyWorkForYou Representatives", () => queryUKRepresentatives(geo)),
-    safeQuery("Local Authority Budget", () => queryUKBudget(geo)),
-  ]);
+  if (economics.status === "fulfilled") {
+    sections.push({
+      title: "Economics",
+      content: formatUkEconomicsResults(economics.value),
+      available: true,
+    });
+  }
 
-  const all = [demographics, crime, weather, airQuality, water, economics, housing, transport, schools, representatives, budget];
-  const available = all.filter(s => s.result !== null).map(s => s.name);
-  const unavailable = all.filter(s => s.result === null).map(s => `${s.name}${s.error ? ` (${s.error})` : ""}`);
+  if (housing.status === "fulfilled") {
+    sections.push({
+      title: "Housing",
+      content: formatUkHousingResults(housing.value),
+      available: true,
+    });
+  }
 
-  const sections: Array<{ title: string; content: string; source: string }> = [];
+  if (crime.status === "fulfilled") {
+    sections.push({
+      title: "Crime",
+      content: formatUkCrimeResults(crime.value),
+      available: true,
+    });
+  }
 
-  if (demographics.result) sections.push({ title: "Demographics", content: formatONSResults(demographics.result), source: "ONS" });
-  if (economics.result) sections.push({ title: "Economy", content: formatUKEconomicsResults(economics.result), source: "ONS" });
-  if (housing.result) sections.push({ title: "Housing", content: formatUKHousingResults(housing.result), source: "ONS/Land Registry" });
-  if (crime.result) sections.push({ title: "Crime", content: formatUKCrimeResults(crime.result), source: "data.police.uk" });
-  if (weather.result) sections.push({ title: "Weather", content: formatUKWeatherResults(weather.result), source: "Met Office" });
-  if (airQuality.result) sections.push({ title: "Air Quality", content: formatUKAirQualityResults(airQuality.result), source: "DEFRA" });
-  if (water.result) sections.push({ title: "Water", content: formatUKWaterResults(water.result), source: "Environment Agency" });
-  if (transport.result) sections.push({ title: "Transport", content: formatUKTransportResults(transport.result), source: "DfT" });
-  if (schools.result) sections.push({ title: "Schools", content: formatUKSchoolResults(schools.result), source: "DfE" });
-  if (representatives.result) sections.push({ title: "Representatives", content: formatUKRepresentativesResults(representatives.result), source: "TheyWorkForYou" });
-  if (budget.result) sections.push({ title: "Budget", content: formatUKBudgetResults(budget.result), source: "DLUHC" });
+  if (airQuality.status === "fulfilled") {
+    sections.push({
+      title: "Air Quality",
+      content: formatUkAirQualityResults(airQuality.value),
+      available: true,
+    });
+  }
 
-  return {
-    city: geo.city,
-    country: 'UK',
-    generatedAt: new Date().toISOString(),
-    sections,
-    dataSources: { available, unavailable },
-  };
-}
+  if (floodWater.status === "fulfilled") {
+    sections.push({
+      title: "Flood & Water Monitoring",
+      content: formatUkFloodWaterResults(floodWater.value),
+      available: true,
+    });
+  }
 
-/**
- * Format UK city briefing as markdown.
- */
-export function formatUKBriefing(briefing: UKCityBriefing): string {
+  if (schools.status === "fulfilled") {
+    sections.push({
+      title: "Education",
+      content: formatUkSchoolsResults(schools.value),
+      available: true,
+    });
+  }
+
+  if (planning.status === "fulfilled") {
+    sections.push({
+      title: "Planning",
+      content: formatUkPlanningResults(planning.value),
+      available: true,
+    });
+  }
+
+  if (finance.status === "fulfilled") {
+    sections.push({
+      title: "Local Government Finance",
+      content: formatUkLocalGovFinanceResults(finance.value),
+      available: true,
+    });
+  }
+
+  // Build final briefing
   const lines: string[] = [
-    `# ${briefing.city}, UK — City Briefing`,
-    `*Generated: ${new Date(briefing.generatedAt).toLocaleDateString("en-GB")}*`,
+    `# UK City Briefing: ${geo.city}`,
+    "",
+    `**Region**: ${geo.region} | **Country**: ${geo.country} | **LAD**: ${geo.ladCode}`,
+    "",
+    `*Briefing compiled from ${sections.length} data sources.*`,
+    "",
+    "---",
     "",
   ];
 
-  for (const section of briefing.sections) {
-    lines.push(section.content);
-    lines.push("");
+  for (const section of sections) {
+    // Strip the top-level header from each section (already has city name)
+    const content = section.content.replace(/^# .+\n\n/, "");
+    lines.push(content, "", "---", "");
   }
 
-  lines.push("---");
-  lines.push(`**Data sources used:** ${briefing.dataSources.available.join(", ")}`);
-  if (briefing.dataSources.unavailable.length > 0) {
-    lines.push(`**Unavailable:** ${briefing.dataSources.unavailable.join(", ")}`);
+  // Note failed sources
+  const allResults = [
+    { name: "Demographics", result: demographics },
+    { name: "Economics", result: economics },
+    { name: "Housing", result: housing },
+    { name: "Crime", result: crime },
+    { name: "Air Quality", result: airQuality },
+    { name: "Flood/Water", result: floodWater },
+    { name: "Schools", result: schools },
+    { name: "Planning", result: planning },
+    { name: "Local Gov Finance", result: finance },
+  ];
+
+  const failed = allResults.filter(r => r.result.status === "rejected");
+  if (failed.length > 0) {
+    lines.push(
+      "## Data Sources Unavailable",
+      "",
+      ...failed.map(f => `- ${f.name}: ${(f.result as PromiseRejectedResult).reason?.message || "Unknown error"}`),
+      "",
+    );
   }
+
+  lines.push(
+    "*Note: Weather and transport data require API keys (UK_MET_OFFICE_API_KEY, UK_TFL_API_KEY).*",
+    "*Representatives data requires UK_TWFY_API_KEY.*",
+  );
 
   return lines.join("\n");
 }

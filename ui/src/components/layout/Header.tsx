@@ -16,6 +16,7 @@ export function Header({ city, onCityChange }: HeaderProps) {
     { label: 'Brief', path: '/brief' },
     { label: 'Changes', path: '/changes' },
     { label: 'Compare', path: '/compare' },
+    { label: 'Explorer', path: '/explorer' },
   ];
 
   return (

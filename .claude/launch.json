@@ -3,10 +3,13 @@
   "configurations": [
     {
       "name": "ui",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["node_modules/.bin/vite", "--port", "5173"],
       "port": 5173,
-      "cwd": "ui"
+      "cwd": "ui",
+      "env": {
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+      }
     }
   ]
 }

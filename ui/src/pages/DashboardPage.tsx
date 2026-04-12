@@ -1,12 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react';
 import { MapPin, Key, ChevronDown, ChevronUp } from 'lucide-react';
 import { OverviewSection } from '../sections/OverviewSection';
 import { DemographicsSection } from '../sections/DemographicsSection';
 import { EconomySection } from '../sections/EconomySection';
+import { CostOfLivingSection } from '../sections/CostOfLivingSection';
 import { HousingSection } from '../sections/HousingSection';
+import { MigrationSection } from '../sections/MigrationSection';
 import { SafetySection } from '../sections/SafetySection';
+import { PublicHealthSection } from '../sections/PublicHealthSection';
+import { HomelessnessSection } from '../sections/HomelessnessSection';
 import { QualitySection } from '../sections/QualitySection';
+import { WeatherSection } from '../sections/WeatherSection';
+import { WaterSection } from '../sections/WaterSection';
+import { ThreeElevenSection } from '../sections/ThreeElevenSection';
 import { GovernmentSection } from '../sections/GovernmentSection';
+import { RepresentativesSection } from '../sections/RepresentativesSection';
 
 interface DashboardPageProps {
   city: string;
@@ -56,6 +64,33 @@ function ApiKeyBanner() {
   );
 }
 
+/** Per-section error boundary so one broken section doesn't kill the page */
+class SectionBoundary extends Component<
+  { name: string; children: ReactNode },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(`[Section: ${this.props.name}]`, error, info.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="mb-8 rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+          <div className="text-sm font-medium mb-1" style={{ color: '#f87171' }}>
+            {this.props.name} failed to render
+          </div>
+          <pre className="text-xs" style={{ color: '#fca5a5', whiteSpace: 'pre-wrap' }}>
+            {this.state.error.message}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function DashboardPage({ city }: DashboardPageProps) {
   return (
     <div>
@@ -65,19 +100,27 @@ export function DashboardPage({ city }: DashboardPageProps) {
           <h1 className="text-3xl font-bold" style={{ color: '#fff' }}>{city}</h1>
         </div>
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Civic data dashboard — powered by 15+ government data sources
+          Civic data dashboard — powered by 20+ government data sources
         </p>
       </div>
 
       <ApiKeyBanner />
 
-      <OverviewSection city={city} />
-      <DemographicsSection city={city} />
-      <EconomySection city={city} />
-      <HousingSection city={city} />
-      <SafetySection city={city} />
-      <QualitySection city={city} />
-      <GovernmentSection city={city} />
+      <SectionBoundary name="Overview"><OverviewSection city={city} /></SectionBoundary>
+      <SectionBoundary name="Weather"><WeatherSection city={city} /></SectionBoundary>
+      <SectionBoundary name="Demographics"><DemographicsSection city={city} /></SectionBoundary>
+      <SectionBoundary name="Migration"><MigrationSection city={city} /></SectionBoundary>
+      <SectionBoundary name="Economy"><EconomySection city={city} /></SectionBoundary>
+      <SectionBoundary name="Cost of Living"><CostOfLivingSection city={city} /></SectionBoundary>
+      <SectionBoundary name="Housing"><HousingSection city={city} /></SectionBoundary>
+      <SectionBoundary name="Safety"><SafetySection city={city} /></SectionBoundary>
+      <SectionBoundary name="Public Health"><PublicHealthSection city={city} /></SectionBoundary>
+      <SectionBoundary name="Homelessness"><HomelessnessSection city={city} /></SectionBoundary>
+      <SectionBoundary name="Quality of Life"><QualitySection city={city} /></SectionBoundary>
+      <SectionBoundary name="Water"><WaterSection city={city} /></SectionBoundary>
+      <SectionBoundary name="311 Requests"><ThreeElevenSection city={city} /></SectionBoundary>
+      <SectionBoundary name="Government"><GovernmentSection city={city} /></SectionBoundary>
+      <SectionBoundary name="Representatives"><RepresentativesSection city={city} /></SectionBoundary>
     </div>
   );
 }
